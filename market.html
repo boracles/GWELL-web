@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>장내자산관리공단 — Market</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+
+    <!-- Supabase UMD -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
+    <script src="assets/js/supabase-init.js"></script>
+    <script src="assets/js/market.js" defer></script>
+  </head>
+  <body>
+    <div class="app app--market">
+      <header class="app-header">
+        <div class="app-header__titles">
+          <h1 class="app-title">장내자산관리공단 — Gut Asset Market</h1>
+          <p class="app-subtitle">
+            사회적 이슈가 변할 때, 장내 데이터 자산의 가치가 어떻게 재평가되는지
+            보여줍니다.
+          </p>
+        </div>
+        <div class="app-header__status">
+          <span id="tickInfo">Tick: 0</span>
+        </div>
+      </header>
+
+      <div class="issue-bar">
+        <span class="issue-tag" id="issueTag">ISSUE</span>
+        <span class="issue-text" id="issueText">초기 이슈 로딩 중...</span>
+      </div>
+
+      <main class="app-main">
+        <div class="app-main-layout">
+          <section class="market-panel">
+            <h2 class="section-title">장내 자산 호가판</h2>
+            <table class="market-table">
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th>Value</th>
+                  <th>Δ</th>
+                  <th>D</th>
+                  <th>B</th>
+                  <th>P</th>
+                  <th>Theme</th>
+                </tr>
+              </thead>
+              <tbody id="marketBody"></tbody>
+            </table>
+          </section>
+
+          <aside class="sidebar-panel">
+            <h2 class="section-title">사회 평가 가중치</h2>
+            <div class="weight-list" id="weightList"></div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,516 @@
+/* ==========================
+   기본
+========================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, "Noto Sans KR",
+    sans-serif;
+  color: #e5e7eb;
+}
+
+/* 색상 토큰 비슷하게 */
+:root {
+  --bg-dark: #020617;
+  --bg-panel: rgba(15, 23, 42, 0.9);
+  --border-soft: rgba(148, 163, 184, 0.4);
+  --accent: #6d5dfc;
+  --accent-soft: rgba(109, 93, 252, 0.1);
+  --green: #4ade80;
+  --red: #f97373;
+}
+
+/* ==========================
+   Entry 페이지
+========================== */
+
+.entry-body {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #111827 0, #020617 55%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entry-wrapper {
+  max-width: 520px;
+  width: 100%;
+  padding: 24px;
+}
+
+.entry-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.entry-title {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.entry-subtitle {
+  font-size: 14px;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.entry-main {
+  background: var(--bg-panel);
+  border-radius: 18px;
+  padding: 20px 18px 24px;
+  border: 1px solid var(--border-soft);
+}
+
+.entry-panel h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.entry-help {
+  font-size: 13px;
+  opacity: 0.8;
+  margin: 0 0 16px;
+}
+
+.entry-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entry-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  text-decoration: none;
+  border: 1px solid var(--border-soft);
+  transition: transform 0.12s ease, box-shadow 0.12s ease,
+    background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.entry-btn--primary {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.entry-btn--primary:hover {
+  box-shadow: 0 12px 30px rgba(109, 93, 252, 0.4);
+  transform: translateY(-1px);
+}
+
+.entry-btn--secondary {
+  background-color: transparent;
+  color: #e5e7eb;
+}
+
+.entry-btn--secondary:hover {
+  background-color: rgba(15, 23, 42, 0.9);
+}
+
+.entry-footer {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* ==========================
+   공통 app 레이아웃
+========================== */
+
+.app {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.app-header__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.app-subtitle {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.app-header__status {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================
+   Standby Overlay (A0)
+========================== */
+
+.standby-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  overflow: hidden;
+}
+
+.standby-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("assets/img/A0-1_Standby.jpg");
+  background-size: cover;
+  background-position: center;
+  filter: blur(2px);
+  transform: scale(1.02);
+}
+
+/* 파티클 캔버스 */
+#standbyParticles {
+  position: absolute;
+  inset: 0;
+}
+
+/* 로고/텍스트 */
+.standby-center {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #f5e4d6;
+}
+
+.standby-logo-main {
+  font-size: 32px;
+  letter-spacing: 0.18em;
+}
+.standby-logo-sub {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* 힌트 문장: 페이드 인/아웃 애니메이션 */
+.standby-hint {
+  margin-top: 18px;
+  font-size: 13px;
+  opacity: 0;
+  animation: hintFade 6s ease-in-out infinite;
+}
+
+@keyframes hintFade {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  } /* 천천히 나타남 */
+  60% {
+    opacity: 1;
+  } /* 잠깐 유지 */
+  100% {
+    opacity: 0;
+  } /* 다시 사라짐 */
+}
+
+.standby-logo {
+  max-width: 70%;
+  height: auto;
+  margin-bottom: 16px;
+}
+
+.standby-logo-text {
+  margin-bottom: 10px;
+}
+
+.standby-logo-main {
+  font-size: 32px;
+  letter-spacing: 0.18em;
+}
+
+.standby-logo-sub {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.standby-copy {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* ==========================
+   Scan 페이지
+========================== */
+
+.app--scan .app-main {
+  padding: 12px 16px 20px;
+  gap: 12px;
+}
+
+.app-cta {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background-color: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+  margin: 0 0 8px;
+}
+
+.summary-panel {
+  background: var(--bg-panel);
+  border-radius: 14px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border-soft);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.summary-item {
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.summary-item-label {
+  opacity: 0.7;
+}
+
+.summary-item-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.list-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+
+.card-list {
+  margin-top: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.profile-card {
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  margin-bottom: 8px;
+}
+
+.profile-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.profile-card__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profile-card__meta {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.profile-card__value {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-card__value.up {
+  color: var(--green);
+}
+
+.profile-card__value.down {
+  color: var(--red);
+}
+
+.profile-card__metrics {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.profile-chip {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* ==========================
+   Market 페이지
+========================== */
+
+.app--market .app-main {
+  padding: 0 20px 20px;
+}
+
+.issue-bar {
+  padding: 8px 20px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.issue-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-size: 11px;
+  margin-right: 8px;
+}
+
+.issue-text {
+  opacity: 0.9;
+}
+
+.app-main-layout {
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.market-panel {
+  flex: 1.6;
+}
+
+.sidebar-panel {
+  flex: 1;
+  background: var(--bg-panel);
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  padding: 10px 12px 12px;
+}
+
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.market-table thead {
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.market-table th,
+.market-table td {
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.market-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.6);
+}
+
+.market-table tbody tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.market-table tbody tr:nth-child(odd) {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.market-table td.val {
+  font-variant-numeric: tabular-nums;
+}
+
+.val.up {
+  color: var(--green);
+}
+
+.val.down {
+  color: var(--red);
+}
+
+.val.neutral {
+  color: #e5e7eb;
+}
+
+.weight-list {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.weight-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 768px) {
+  .app-main-layout {
+    flex-direction: column;
+  }
+}

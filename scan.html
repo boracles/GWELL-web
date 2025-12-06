@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>장내자산 스캔 — Scan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+
+    <!-- Supabase UMD -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
+    <script src="assets/js/supabase-init.js"></script>
+    <script src="assets/js/scan.js" defer></script>
+    <style>
+      /* 이 페이지 전용 약간의 추가 스타일 (필요하면 style.css로 옮겨도 됨) */
+      .scan-root {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 12px 16px 20px;
+        gap: 12px;
+      }
+
+      .scan-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(circle at top, #111827 0, #020617 60%);
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        padding: 16px 16px 18px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .scan-bg {
+        position: absolute;
+        inset: 0;
+        opacity: 0.3;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .scan-bg.particles {
+        background: radial-gradient(
+          circle at center,
+          #38bdf8 0,
+          transparent 55%
+        );
+      }
+
+      .scan-bg.spiral {
+        background: radial-gradient(
+          circle at center,
+          #a855f7 0,
+          transparent 50%
+        );
+      }
+
+      .scan-bg.noise {
+        background: radial-gradient(
+          circle at center,
+          #f97316 0,
+          transparent 60%
+        );
+      }
+
+      .scan-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      .scan-top-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .scan-status-block {
+        font-size: 11px;
+        opacity: 0.82;
+      }
+
+      .scan-status-block span.label {
+        opacity: 0.7;
+      }
+
+      .scan-status-block span.val {
+        font-variant-numeric: tabular-nums;
+        margin-left: 4px;
+      }
+
+      .scan-main-message {
+        margin-top: 12px;
+      }
+
+      .scan-main-message h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+      }
+
+      .scan-main-message p {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+
+      .scan-secondary {
+        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.82;
+      }
+
+      .scan-bottom {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .scan-progress-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        opacity: 0.85;
+      }
+
+      .scan-progress-bar {
+        width: 100%;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.9);
+        overflow: hidden;
+      }
+
+      .scan-progress-bar-inner {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #22c55e, #a855f7, #38bdf8);
+        transition: width 0.3s ease;
+      }
+
+      .scan-purity-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .scan-buttons-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .scan-btn-ghost {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+        background: transparent;
+        color: #e5e7eb;
+        font-size: 12px;
+      }
+
+      .scan-btn-primary {
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: none;
+        background: #6d5dfc;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .scan-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        font-size: 10px;
+        opacity: 0.8;
+      }
+
+      .scan-warning {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #f97373;
+      }
+
+      .scan-result-list {
+        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .scan-result-list div {
+        margin-bottom: 2px;
+      }
+
+      .scan-debug-row {
+        margin-top: 8px;
+        font-size: 10px;
+        opacity: 0.6;
+      }
+
+      /* 센서 시뮬레이터 버튼 (실제 설치에서는 숨겨도 됨) */
+      .sensor-sim {
+        margin-top: 8px;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .sensor-sim button {
+        padding: 4px 8px;
+        font-size: 11px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        background: rgba(15, 23, 42, 0.9);
+        color: #e5e7eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app app--scan">
+      <!-- Standby 화면: 파티클 + 힌트 한 줄 -->
+      <div id="standbyScreen" class="standby-screen">
+        <div class="standby-bg"></div>
+        <canvas id="standbyParticles"></canvas>
+        <div class="standby-center">
+          <div class="standby-hint" id="standbyHint">
+            착석 시 스캔 절차가 시작됩니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- 실제 스캔 UI 헤더 (이게 scanHeader) -->
+      <header class="app-header" id="scanHeader">
+        <div class="app-header__titles">
+          <h1 class="app-title">장내자산 스캔</h1>
+          <p class="app-subtitle">
+            변기에 앉는 순간, 장내 데이터가 정제되어 사회적 자산으로 평가됩니다.
+          </p>
+        </div>
+        <!-- 실제 설치에선 숨겨도 되는 디버그 버튼 -->
+        <button class="app-cta" id="debugStartBtn">디버그: 시퀀스 시작</button>
+      </header>
+
+      <!-- 스캔 메인 영역 (이게 scanRoot) -->
+      <div class="scan-root" id="scanRoot">
+        <div class="scan-main">
+          <div class="scan-bg particles" id="scanBg"></div>
+
+          <div class="scan-content">
+            <!-- 상단 상태 블럭 -->
+            <div class="scan-top-row">
+              <div class="scan-status-block">
+                <div>
+                  <span class="label">PIR:</span>
+                  <span class="val" id="statusPir">OFF</span>
+                </div>
+                <div>
+                  <span class="label">Pressure:</span>
+                  <span class="val" id="statusPressure">OFF</span>
+                </div>
+                <div>
+                  <span class="label">System:</span>
+                  <span class="val" id="statusSystem">IDLE</span>
+                </div>
+              </div>
+              <div class="scan-status-block" style="text-align: right">
+                <div>
+                  <span class="label">Phase:</span>
+                  <span class="val" id="statusPhase">A0-1</span>
+                </div>
+                <div>
+                  <span class="label">Timer:</span>
+                  <span class="val" id="statusTimer">00:00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 메인 메시지 -->
+            <div class="scan-main-message">
+              <h2 id="mainMessage">대기 중입니다.</h2>
+              <p id="subMessage">
+                관람객 접근 전, 시스템은 장내자산 스캔을 준비하고 있습니다.
+              </p>
+              <div class="scan-secondary" id="secondaryMessage">
+                변기 근처에 다가오면 시스템이 자동으로 깨어납니다.
+              </div>
+            </div>
+
+            <!-- 경고 / 결과 -->
+            <div
+              class="scan-warning"
+              id="warningMessage"
+              style="display: none"
+            ></div>
+            <div
+              class="scan-result-list"
+              id="resultList"
+              style="display: none"
+            ></div>
+
+            <!-- 센서 시뮬레이터 -->
+            <div class="sensor-sim" id="sensorSim">
+              <button id="btnPirOn">접근 감지(PIR ON)</button>
+              <button id="btnPirOff">PIR OFF</button>
+              <button id="btnSit">압력센서 ON(착석)</button>
+              <button id="btnStand">압력센서 OFF(이탈)</button>
+              <button id="btnReset">강제 리셋</button>
+            </div>
+
+            <!-- 하단: 진행/정제율/버튼 -->
+            <div class="scan-bottom">
+              <div class="scan-progress-row">
+                <div id="progressLabel">스캔 대기</div>
+                <div id="progressTime">00:00 / 00:30</div>
+              </div>
+              <div class="scan-progress-bar">
+                <div
+                  class="scan-progress-bar-inner"
+                  id="progressBarInner"
+                ></div>
+              </div>
+
+              <div class="scan-purity-row">
+                <div>
+                  <span class="scan-tag">정제율</span>
+                  <span id="purityValue">0%</span>
+                </div>
+                <div id="remainingTime">남은 시간: -</div>
+              </div>
+
+              <div
+                class="scan-buttons-row"
+                id="decisionButtons"
+                style="display: none"
+              >
+                <button class="scan-btn-ghost" id="btnNo">
+                  NO · 상장하지 않기
+                </button>
+                <button class="scan-btn-primary" id="btnYes">
+                  YES · 사회 자산으로 상장
+                </button>
+              </div>
+
+              <div class="scan-debug-row" id="debugInfo">
+                A0-1: Standby → PIR ON(A0-2) → 압력 ON(A1) → B(스캔) → C(결과) →
+                YES/NO 상장.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
