@@ -6,32 +6,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="assets/css/style.css" />
 
-    <!-- Chart.js + 금융 차트 플러그인 (캔들 차트용) -->
+    <!-- Chart.js + 금융 차트 플러그인 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 
-    <!-- Supabase (그대로) -->
+    <!-- Supabase (필요하면 유지) -->
     <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
     <script src="assets/js/supabase-init.js"></script>
 
-    <!-- 우리 시뮬레이션 로직 -->
+    <!-- 우리 로직 -->
     <script src="assets/js/market.js" defer></script>
   </head>
   <body class="market-body">
     <div class="market-shell">
-      <!-- 맨 위 로고 바 -->
+      <!-- 상단 로고 바 -->
       <header class="market-header">
         <div class="market-logo">
-          장내자산관리공단<span class="market-logo-sub">
-            Gut Asset Management</span
-          >
+          장내자산관리공단
+          <span class="market-logo-sub">Gut Asset Management</span>
         </div>
-        <div class="market-header-right" id="marketTime">
-          <!-- 시간 표시 -->
-        </div>
+        <div class="market-header-right" id="marketTime"></div>
       </header>
 
-      <!-- 상단 얇은 정보 스트립 (버전, 상태, ID 등) -->
+      <!-- 얇은 시스템 스트립 -->
       <div class="market-strip">
         <div class="strip-item">공단 실사 시스템 Ver 3.2</div>
         <div class="strip-item strip-center">실시간 장내 데이터 상장 상태</div>
@@ -42,28 +39,40 @@
         </div>
       </div>
 
-      <!-- 이슈/뉴스 바 -->
+      <!-- 이슈/뉴스 바 (더 크게) -->
       <div class="issue-bar issue-bar--market">
         <span class="issue-tag" id="issueTag">ISSUE</span>
-        <span class="issue-text" id="issueText">초기 이슈 로딩 중...</span>
+        <div class="issue-text-wrap">
+          <span class="issue-text" id="issueText"> 초기 이슈 로딩 중... </span>
+        </div>
       </div>
 
-      <!-- 메인 영역: 위 요약 + 캔들 차트 -->
       <main class="market-main">
-        <!-- 상단 티커 요약 -->
+        <!-- 상단 티커 + 우측 수치/파라미터 -->
         <section class="ticker-row">
-          <div class="ticker-left">
+          <!-- 좌: ID + 가격 -->
+          <div class="ticker-main">
             <div class="ticker-id" id="tickerId">ID GA-01</div>
+
             <div class="ticker-price-row">
               <span class="ticker-price" id="tickerPrice">0.00</span>
               <span class="ticker-delta" id="tickerDelta">+0.00</span>
               <span class="ticker-rate" id="tickerRate">+0.00%</span>
             </div>
+
+            <!-- 간단 설명 -->
             <div class="ticker-sub" id="tickerSub">
-              장내 자산 실시간 상장 상태.
+              장내 데이터 기반 실시간 상장 상태.
+            </div>
+
+            <!-- 장내 미생물 파라미터 + 사회 환산가치 문장 -->
+            <div class="ticker-meta" id="tickerMeta">
+              정제율 0% · 사회 효율 환산가 0.00 · 사회 기여도 - · 거래 등급 Lv0
             </div>
           </div>
-          <div class="ticker-right">
+
+          <!-- 중간: 기본 시세 정보 -->
+          <div class="ticker-stats">
             <div class="ticker-stat">
               <span class="label">Open</span>
               <span class="value" id="statOpen">-</span>
@@ -85,14 +94,70 @@
               <span class="value" id="stat52Low">-</span>
             </div>
           </div>
+
+          <!-- 우: 스캔 파라미터 카드 -->
+          <div class="ticker-params">
+            <div class="params-title">ID 스캔 파라미터</div>
+            <div class="param-row">
+              <span class="label">정제율</span>
+              <span class="value" id="metricPurity">0%</span>
+            </div>
+            <div class="param-row">
+              <span class="label">사회 효율 환산가</span>
+              <span class="value" id="metricEfficiency">0.00</span>
+            </div>
+            <div class="param-row">
+              <span class="label">사회 기여도</span>
+              <span class="value" id="metricContribution">-</span>
+            </div>
+            <div class="param-row">
+              <span class="label">거래 등급</span>
+              <span class="value" id="metricLevel">Lv0</span>
+            </div>
+          </div>
         </section>
 
-        <!-- 차트 박스 -->
+        <!-- 메인 차트 + 아래 인디케이터 -->
         <section class="chart-panel">
-          <canvas id="priceChart"></canvas>
+          <div class="chart-main">
+            <canvas id="priceChart"></canvas>
+          </div>
+          <div class="chart-indicator">
+            <div class="indicator-label">정상성 지수 (0–100)</div>
+            <canvas id="indicatorChart"></canvas>
+          </div>
         </section>
 
-        <!-- 맨 아래 안내 문구 -->
+        <!-- 메인 차트 + 아래 인디케이터 -->
+        <section class="chart-panel">
+          <div class="chart-main">
+            <canvas id="priceChart"></canvas>
+          </div>
+          <div class="chart-indicator">
+            <div class="indicator-label">정상성 지수 (0–100)</div>
+            <canvas id="indicatorChart"></canvas>
+          </div>
+        </section>
+
+        <!-- ID별 가치 비교 테이블 -->
+        <section class="comparison-panel">
+          <div class="comparison-title">ID별 가치 비교</div>
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>프로필</th>
+                <th>Value</th>
+                <th>Δ</th>
+                <th>Theme</th>
+                <th>사회 기여도</th>
+                <th>거래 등급</th>
+              </tr>
+            </thead>
+            <tbody id="comparisonBody"></tbody>
+          </table>
+        </section>
+
         <footer class="market-footer">
           공단 자산 거래소 상장 완료. 사회 순환 포인트 입금 후 거래소 존으로
           이동하여 가치 변동을 확인하십시오.

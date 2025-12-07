@@ -293,7 +293,6 @@
                 <!-- JS에서 문장 교체함 -->
               </div>
 
-              <!-- 🔹 4단계 프로그레스 + 체크 (시작에는 체크 없음) -->
               <div class="posture-stepper">
                 <div class="posture-progress-bar">
                   <div
@@ -302,19 +301,31 @@
                   ></div>
                 </div>
                 <div class="posture-stepper-dots">
+                  <!-- 🔹 시작 지점: 공간만 차지, 실제 단계 아님 -->
+                  <div class="posture-step posture-step--start">
+                    <span class="posture-step-dot"></span>
+                  </div>
+
+                  <!-- 🔹 1단계 -->
+                  <div class="posture-step" data-step="0">
+                    <span class="posture-step-dot"></span>
+                    <span class="posture-step-check">✔</span>
+                  </div>
+
+                  <!-- 🔹 2단계 -->
                   <div class="posture-step" data-step="1">
                     <span class="posture-step-dot"></span>
                     <span class="posture-step-check">✔</span>
                   </div>
+
+                  <!-- 🔹 3단계 -->
                   <div class="posture-step" data-step="2">
                     <span class="posture-step-dot"></span>
                     <span class="posture-step-check">✔</span>
                   </div>
+
+                  <!-- 🔹 4단계 -->
                   <div class="posture-step" data-step="3">
-                    <span class="posture-step-dot"></span>
-                    <span class="posture-step-check">✔</span>
-                  </div>
-                  <div class="posture-step" data-step="4">
                     <span class="posture-step-dot"></span>
                     <span class="posture-step-check">✔</span>
                   </div>

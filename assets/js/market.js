@@ -13,13 +13,19 @@ const MAIN_ASSET_INDEX = 0;
 // DOM (이슈/상태/티커 + 통계용)
 let tickInfoEl, issueTagEl, issueTextEl, weightListEl;
 let tickerIdEl, tickerPriceEl, tickerDeltaEl, tickerRateEl, tickerSubEl;
+let tickerMetaEl;
 let statOpenEl, statHighEl, statLowEl, stat52HighEl, stat52LowEl;
 let stripIdEl, stripRefEl, marketTimeEl;
+let metricPurityEl, metricEfficiencyEl, metricContributionEl, metricLevelEl;
 
-// 캔들 차트 데이터
+// 캔들 차트 + 인디케이터 데이터
 let priceChart;
 let candleData = [];
 const MAX_CANDLES = 120;
+
+let indicatorChart;
+let indicatorData = [];
+const MAX_INDICATOR_POINTS = 120;
 
 // 52주(실제로는 전체 기간) 통계
 let globalHigh = null;
@@ -98,7 +104,7 @@ const issues = [
     text: "노동·젠더·환경 이슈를 둘러싼 연대와 파업이 이어지고 있습니다.",
     weightMap: { 저항: 0.9, 생산성: -0.5, "순응/정상성": -0.4 },
   },
-  // ... 나머지 ISSUE-05 ~ ISSUE-30 그대로 유지 ...
+  // ... ISSUE-05 ~ ISSUE-29 생략 ...
   {
     id: "ISSUE-30",
     tag: "정상성에서 밀려난 장",
@@ -121,16 +127,73 @@ function pickNewIssue(prevIssue) {
   return candidate;
 }
 
-// 숫자 포맷
 function formatNumber(num) {
   return num.toFixed(2);
+}
+
+// ====== 오른쪽 끝 현재가 라벨 플러그인 ======
+const lastValueLabelPlugin = {
+  id: "lastValueLabel",
+  afterDraw(chart, args, pluginOptions) {
+    if (chart.config.type !== "candlestick") return;
+
+    const ds = chart.data.datasets[0];
+    if (!ds || !ds.data || ds.data.length === 0) return;
+
+    const last = ds.data[ds.data.length - 1];
+    if (last == null || last.c == null) return;
+
+    const yScale = chart.scales.y;
+    const y = yScale.getPixelForValue(last.c);
+    const xRight = chart.chartArea.right;
+
+    const ctx = chart.ctx;
+    const label = formatNumber(last.c); // 기존 formatNumber 사용
+
+    ctx.save();
+    ctx.font = "11px -apple-system, system-ui, sans-serif";
+    const textWidth = ctx.measureText(label).width;
+    const paddingX = 6;
+    const paddingY = 3;
+    const boxWidth = textWidth + paddingX * 2;
+    const boxHeight = 18;
+    const boxX = xRight + 4;
+    const boxY = y - boxHeight / 2;
+
+    // 보라 박스
+    ctx.fillStyle = "#4c1d95";
+    ctx.strokeStyle = "#a855f7";
+    ctx.lineWidth = 1;
+
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+      ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+    }
+
+    // 텍스트
+    ctx.fillStyle = "#e5e7eb";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, boxX + paddingX, y);
+
+    ctx.restore();
+  },
+};
+
+// Chart.js에 플러그인 등록
+if (typeof Chart !== "undefined") {
+  Chart.register(lastValueLabelPlugin);
 }
 
 function getMainAsset() {
   return assets[MAIN_ASSET_INDEX];
 }
 
-// 노이즈 포함 자산 값 업데이트
+// ====== 자산 값 업데이트 ======
 function updateAssetValues(issue) {
   assets.forEach((asset) => {
     asset.prevValue = asset.value;
@@ -182,6 +245,77 @@ function renderTicker() {
   stat52LowEl.textContent = globalLow !== null ? formatNumber(globalLow) : "-";
 }
 
+// ====== 스캔 파라미터(정제율/효율/기여도/등급) ======
+function computeScanParams(asset) {
+  // D, B, P 를 이용한 대략적인 매핑
+  const purity = Math.round(
+    (asset.D * 0.4 + asset.B * 0.3 + (1 - asset.P) * 0.3) * 100
+  );
+
+  const efficiency = (asset.value / 100).toFixed(2);
+
+  let contributionScore = (asset.P * 0.6 + asset.D * 0.2 + asset.B * 0.2) * 100;
+  let contribution;
+  if (contributionScore > 85) contribution = "A+";
+  else if (contributionScore > 75) contribution = "A";
+  else if (contributionScore > 65) contribution = "B+";
+  else if (contributionScore > 55) contribution = "B";
+  else contribution = "C";
+
+  let level;
+  if (asset.value > 130) level = "Lv4";
+  else if (asset.value > 110) level = "Lv3";
+  else if (asset.value > 90) level = "Lv2";
+  else level = "Lv1";
+
+  return { purity, efficiency, contribution, level };
+}
+
+function renderScanParams() {
+  const asset = getMainAsset();
+  if (!asset || !metricPurityEl) return;
+
+  const m = computeScanParams(asset);
+  metricPurityEl.textContent = `${m.purity}%`;
+  metricEfficiencyEl.textContent = m.efficiency;
+  metricContributionEl.textContent = m.contribution;
+  metricLevelEl.textContent = m.level;
+
+  if (tickerMetaEl) {
+    tickerMetaEl.textContent =
+      `정제율 ${m.purity}% · 사회 효율 환산가 ${m.efficiency}` +
+      ` · 사회 기여도 ${m.contribution} · 거래 등급 ${m.level}`;
+  }
+}
+
+function renderComparisonTable() {
+  if (!comparisonBodyEl) return;
+
+  comparisonBodyEl.innerHTML = "";
+
+  assets.forEach((asset) => {
+    const m = computeScanParams(asset);
+    const delta = asset.value - asset.prevValue;
+    const deltaLabel = (delta >= 0 ? "+" : "") + formatNumber(delta);
+
+    let deltaClass = "neutral";
+    if (delta > 0.05) deltaClass = "up";
+    else if (delta < -0.05) deltaClass = "down";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${asset.id}</td>
+      <td>${asset.name}</td>
+      <td class="val">${formatNumber(asset.value)}</td>
+      <td class="val ${deltaClass}">${deltaLabel}</td>
+      <td>${asset.theme}</td>
+      <td>${m.contribution}</td>
+      <td>${m.level}</td>
+    `;
+    comparisonBodyEl.appendChild(tr);
+  });
+}
+
 // ====== 이슈 / 상태 ======
 function renderWeights(issue) {
   if (!weightListEl || !issue) return;
@@ -219,6 +353,7 @@ function renderTick() {
   tickInfoEl.textContent = `Tick: ${tick}`;
 }
 
+// ====== 캔들 차트 ======
 function initPriceChart() {
   const canvas = document.getElementById("priceChart");
   if (!canvas) return;
@@ -268,7 +403,7 @@ function initPriceChart() {
       },
       scales: {
         x: {
-          type: "linear", // 🔑 여기!
+          type: "linear",
           ticks: { display: false },
           grid: { display: false },
         },
@@ -319,6 +454,89 @@ function updatePriceChart() {
   priceChart.update("none");
 }
 
+// ====== 인디케이터 차트 (정상성 지수) ======
+function computeNormalityIndex(asset) {
+  // D(다양성), B(유익), P(유해)를 조합한 0~100 지수
+  const normB = asset.B;
+  const normP = 1 - asset.P;
+  const idealD = 0.6;
+  const normD = 1 - Math.min(Math.abs(asset.D - idealD) / idealD, 1); // 0~1
+
+  let idx = (normB * 0.4 + normP * 0.4 + normD * 0.2) * 100;
+  if (idx < 0) idx = 0;
+  if (idx > 100) idx = 100;
+  return idx;
+}
+
+function initIndicatorChart() {
+  const canvas = document.getElementById("indicatorChart");
+  if (!canvas) return;
+
+  const asset = getMainAsset();
+  const firstIdx = computeNormalityIndex(asset);
+
+  indicatorData = [{ x: tick, y: firstIdx }];
+
+  const ctx = canvas.getContext("2d");
+
+  indicatorChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      datasets: [
+        {
+          data: indicatorData,
+          borderWidth: 1.5,
+          tension: 0.3,
+          pointRadius: 0,
+          fill: true,
+          borderColor: "#8b5cf6",
+          backgroundColor: "rgba(139, 92, 246, 0.18)",
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: {
+          type: "linear",
+          ticks: { display: false },
+          grid: { display: false },
+        },
+        y: {
+          min: 0,
+          max: 100,
+          ticks: {
+            color: "#e5e7eb",
+            font: { size: 9 },
+          },
+          grid: {
+            color: "rgba(148,163,184,0.25)",
+          },
+        },
+      },
+    },
+  });
+}
+
+function appendIndicatorPoint() {
+  const asset = getMainAsset();
+  const idx = computeNormalityIndex(asset);
+  indicatorData.push({ x: tick, y: idx });
+  if (indicatorData.length > MAX_INDICATOR_POINTS) {
+    indicatorData.shift();
+  }
+}
+
+function updateIndicatorChart() {
+  if (!indicatorChart) return;
+  indicatorChart.data.datasets[0].data = indicatorData;
+  indicatorChart.update("none");
+}
+
 // ====== 메인 루프 ======
 function step() {
   tick++;
@@ -335,27 +553,32 @@ function step() {
     updateAssetValues(currentIssue);
   }
 
-  // 메인 자산 기준으로 캔들 추가
+  // 캔들 & 인디케이터 데이터 추가
   appendCandle();
+  appendIndicatorPoint();
 
   // 렌더
   renderTick();
   renderTicker();
+  renderScanParams();
+  renderComparisonTable();
   updatePriceChart();
+  updateIndicatorChart();
 }
 
 // ====== 초기화 ======
 function init() {
-  tickInfoEl = document.getElementById("tickInfo");
+  tickInfoEl = document.getElementById("tickInfo"); // 없어도 무방
   issueTagEl = document.getElementById("issueTag");
   issueTextEl = document.getElementById("issueText");
-  weightListEl = document.getElementById("weightList"); // 없어도 됨
+  weightListEl = document.getElementById("weightList"); // 없으면 생략
 
   tickerIdEl = document.getElementById("tickerId");
   tickerPriceEl = document.getElementById("tickerPrice");
   tickerDeltaEl = document.getElementById("tickerDelta");
   tickerRateEl = document.getElementById("tickerRate");
   tickerSubEl = document.getElementById("tickerSub");
+  tickerMetaEl = document.getElementById("tickerMeta");
 
   statOpenEl = document.getElementById("statOpen");
   statHighEl = document.getElementById("statHigh");
@@ -366,6 +589,11 @@ function init() {
   stripIdEl = document.getElementById("stripId");
   stripRefEl = document.getElementById("stripRef");
   marketTimeEl = document.getElementById("marketTime");
+
+  metricPurityEl = document.getElementById("metricPurity");
+  metricEfficiencyEl = document.getElementById("metricEfficiency");
+  metricContributionEl = document.getElementById("metricContribution");
+  metricLevelEl = document.getElementById("metricLevel");
 
   // 상단 시간 표시
   if (marketTimeEl) {
@@ -387,12 +615,15 @@ function init() {
     setInterval(updateTime, 1000);
   }
 
-  // 초기 이슈/티커/차트 세팅
+  // 초기 이슈/티커/파라미터/차트 세팅
   currentIssue = pickNewIssue(null);
   renderIssue(currentIssue);
   renderWeights(currentIssue);
   renderTicker();
+  renderScanParams();
+  renderComparisonTable();
   initPriceChart();
+  initIndicatorChart();
 
   setInterval(step, TICK_INTERVAL_MS);
 }

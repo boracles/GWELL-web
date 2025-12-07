@@ -846,12 +846,6 @@ body {
 }
 
 .posture-step-check {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -866,6 +860,69 @@ body {
   opacity: 1;
 }
 
+.posture-stepper-dots {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.posture-step {
+  position: relative;
+  width: 16px;
+  height: 16px;
+}
+
+.posture-step-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.posture-step-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* 완료된 스텝에서만 체크 표시 */
+.posture-step.completed .posture-step-dot {
+  border-color: #22c55e;
+  background: #22c55e;
+}
+
+.posture-step.completed .posture-step-check {
+  opacity: 1;
+}
+
+/* 🔹 시작 포인트: 점도 거의 안 보이게 (투명한 자리만) */
+.posture-step--start .posture-step-dot {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* 혹시라도 체크가 들어가도 무조건 숨기기 */
+.posture-step--start .posture-step-check {
+  display: none !important;
+}
+
+/* 시작 포인트: 동그라미도 연해지게 or 완전 숨기고 싶으면 이렇게 */
+.posture-step--start .posture-step-dot {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* 시작 포인트에는 체크 자체가 아예 없음 (HTML에도 안 넣었지만, 혹시 대비) */
+.posture-step--start .posture-step-check {
+  display: none !important;
+}
+
 .posture-step.start .posture-step-check {
   display: none !important;
 }
@@ -878,7 +935,7 @@ body {
 }
 
 /* ==========================
-   Market 페이지 — 트레이딩 화면 스타일
+   Market 페이지 – 주식창 레이아웃
 ========================== */
 
 .market-body {
@@ -941,14 +998,13 @@ body {
 }
 
 .strip-center {
-  text-align: center;
   flex: 1;
+  text-align: center;
 }
 
 .strip-right {
   display: flex;
   gap: 6px;
-  justify-content: flex-end;
   align-items: center;
 }
 
@@ -957,10 +1013,33 @@ body {
   opacity: 0.6;
 }
 
-/* 이슈 바 — 기존 issue-bar 클래스를 약간만 재사용 */
+/* 이슈/뉴스 바 – 크게 */
 .issue-bar--market {
-  padding-left: 18px;
-  padding-right: 18px;
+  padding: 10px 24px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.issue-tag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-size: 11px;
+  margin-right: 0;
+  white-space: nowrap;
+}
+
+.issue-text-wrap {
+  flex: 1;
+}
+
+.issue-text {
+  opacity: 0.95;
+  line-height: 1.5;
 }
 
 /* 메인 영역 */
@@ -968,42 +1047,44 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 8px 18px 16px;
-  gap: 8px;
+  padding: 10px 18px 16px;
+  gap: 10px;
 }
 
-/* 티커 요약 */
 .ticker-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.3fr) minmax(0, 1.5fr);
+  gap: 20px;
+  align-items: flex-start;
 }
 
-.ticker-left {
+.ticker-main {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  padding: 4px 0 6px;
 }
 
 .ticker-id {
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.8;
+  color: #a5b4fc;
 }
 
 .ticker-price-row {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ticker-price {
-  font-size: 32px;
+  font-size: 40px;
   font-weight: 600;
+  color: #c4b5fd; /* 보라톤 가격 */
 }
 
 .ticker-delta {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .ticker-delta.up {
@@ -1024,10 +1105,16 @@ body {
   opacity: 0.7;
 }
 
-.ticker-right {
+.ticker-meta {
+  font-size: 11px;
+  opacity: 0.95;
+  color: #e5e7ff;
+}
+
+.ticker-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 18px;
   font-size: 11px;
 }
 
@@ -1039,26 +1126,91 @@ body {
 
 .ticker-stat .value {
   font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #c4b5fd; /* 보라 */
 }
 
-/* 차트 패널 */
+.ticker-params {
+  background: rgba(17, 24, 39, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.6); /* 보라 아웃라인 */
+  padding: 10px 11px;
+  font-size: 11px;
+  box-shadow: 0 0 18px rgba(76, 29, 149, 0.35);
+}
+
+.params-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  opacity: 0.95;
+  color: #e9d5ff;
+}
+
+.param-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+}
+
+.param-row .label {
+  opacity: 0.75;
+}
+
+.param-row .value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #ddd6fe;
+}
+
+/* 차트 + 인디케이터 */
 .chart-panel {
   flex: 1;
-  background: #020617;
-  border-radius: 0 0 12px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  padding: 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 4px;
 }
 
-.chart-panel canvas {
+.chart-main {
+  background: #020617;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 6px 6px 8px;
+  height: 360px; /* ✅ 높이 고정 */
+}
+
+.chart-main canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 아래 인디케이터 */
+.chart-indicator {
+  background: #020617;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 4px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 90px; /* ✅ 확실히 보이는 높이 */
+}
+
+.indicator-label {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.chart-indicator canvas {
   width: 100% !important;
   height: 100% !important;
 }
 
 /* 하단 문구 */
 .market-footer {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 10px;
   opacity: 0.7;
   text-align: center;
@@ -1066,15 +1218,83 @@ body {
   padding-top: 4px;
 }
 
+/* ==========================
+   ID별 가치 비교 테이블
+========================== */
+
+.comparison-panel {
+  margin-top: 8px;
+  background: #020617;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 6px 10px 10px;
+}
+
+.comparison-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+  margin-bottom: 4px;
+  color: #c4b5fd;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.comparison-table thead {
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.comparison-table th {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.comparison-table tbody tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.comparison-table tbody tr:nth-child(odd) {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.comparison-table td.val {
+  font-variant-numeric: tabular-nums;
+}
+
+.comparison-table td.val.up {
+  color: #4ade80;
+}
+
+.comparison-table td.val.down {
+  color: #f97373;
+}
+
+.comparison-table td.val.neutral {
+  color: #e5e7eb;
+}
+
 /* 반응형 */
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .ticker-row {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
   }
 
-  .ticker-right {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .ticker-params {
+    order: 3;
   }
 }
 
