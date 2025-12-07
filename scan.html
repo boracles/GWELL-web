@@ -24,9 +24,12 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        background: radial-gradient(circle at top, #111827 0, #020617 60%);
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
+
+        /* 안쪽 남색 패널 제거 → 바깥 .app 배경과 하나로 보이게 */
+        background: transparent;
+        border-radius: 0;
+        border: none;
+
         padding: 16px 16px 18px;
         position: relative;
         overflow: hidden;
@@ -43,8 +46,8 @@
       .scan-bg.particles {
         background: radial-gradient(
           circle at center,
-          #38bdf8 0,
-          transparent 55%
+          rgba(57, 20, 107, 0.85) 0%,
+          /* #39146B 기반 */ transparent 60%
         );
       }
 
@@ -223,6 +226,17 @@
         background: rgba(15, 23, 42, 0.9);
         color: #e5e7eb;
       }
+
+      /* 디버그 UI 전부 숨기기 */
+      #debugStartBtn {
+        display: none;
+      }
+      .sensor-sim {
+        display: none;
+      }
+      .scan-debug-row {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -256,8 +270,41 @@
           <div class="scan-bg particles" id="scanBg"></div>
 
           <div class="scan-content">
+            <div class="scan-posture" id="scanPosture" style="display: none">
+              <!-- 인포그래픽 -->
+              <div class="posture-graphic">
+                <img
+                  src="assets/img/Sit.svg"
+                  class="posture-img posture-img--idle"
+                  id="postureImg"
+                  alt="올바른 착석 자세 인포그래픽"
+                />
+              </div>
+
+              <div class="posture-message">올바른 자세로 앉아 주세요.</div>
+
+              <div class="posture-sub posture-line" id="postureLine1">
+                등을 곧게 펴세요.
+              </div>
+
+              <div class="posture-sub posture-line" id="postureLine2">
+                발을 바닥에 붙이고 엉덩이에 힘을 주세요.
+              </div>
+
+              <div class="posture-sub posture-line" id="postureLine3">
+                몸을 흔들지 말고 호흡을 고르게 유지하세요.
+              </div>
+
+              <div
+                class="posture-sub posture-sub-soft posture-line"
+                id="postureLine4"
+              >
+                잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.
+              </div>
+            </div>
+
             <!-- 상단 상태 블럭 -->
-            <div class="scan-top-row">
+            <div class="scan-top-row" id="scanTopRow">
               <div class="scan-status-block">
                 <div>
                   <span class="label">PIR:</span>
@@ -285,7 +332,7 @@
             </div>
 
             <!-- 메인 메시지 -->
-            <div class="scan-main-message">
+            <div class="scan-main-message" id="scanMainMessage">
               <h2 id="mainMessage">대기 중입니다.</h2>
               <p id="subMessage">
                 관람객 접근 전, 시스템은 장내자산 스캔을 준비하고 있습니다.
@@ -317,19 +364,19 @@
             </div>
 
             <!-- 하단: 진행/정제율/버튼 -->
-            <div class="scan-bottom">
-              <div class="scan-progress-row">
+            <div class="scan-bottom" id="scanBottom">
+              <div class="scan-progress-row" id="progressRow">
                 <div id="progressLabel">스캔 대기</div>
                 <div id="progressTime">00:00 / 00:30</div>
               </div>
-              <div class="scan-progress-bar">
+              <div class="scan-progress-bar" id="progressBar">
                 <div
                   class="scan-progress-bar-inner"
                   id="progressBarInner"
                 ></div>
               </div>
 
-              <div class="scan-purity-row">
+              <div class="scan-purity-row" id="purityRow">
                 <div>
                   <span class="scan-tag">정제율</span>
                   <span id="purityValue">0%</span>

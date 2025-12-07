@@ -9,6 +9,18 @@ const scanRootEl = document.getElementById("scanRoot");
 const standbyCanvas = document.getElementById("standbyParticles");
 const standbyCtx = standbyCanvas.getContext("2d");
 
+const postureEl = document.getElementById("scanPosture");
+const scanTopRowEl = document.getElementById("scanTopRow");
+const scanMainMessageEl = document.getElementById("scanMainMessage");
+const scanBottomEl = document.getElementById("scanBottom");
+const standbyHintEl = document.getElementById("standbyHint");
+
+const sensorSimEl = document.getElementById("sensorSim");
+
+const postureLine1El = document.getElementById("postureLine1");
+const postureLine2El = document.getElementById("postureLine2");
+const postureLine3El = document.getElementById("postureLine3");
+
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
@@ -23,6 +35,8 @@ let loopInterval = null;
 
 let lastSitTime = null;
 let lastPressureChangeTime = null;
+
+let postureTimers = [];
 
 // 결과에 쓸 가상의 분석값(장내 다양성 등)
 let analysisResult = null;
@@ -161,7 +175,7 @@ function drawStandbyParticles(time) {
       const wobble2 = Math.cos(t * p.speed * 0.7 + p.phase) * 3;
 
       // 0 → 1 로 점점 증가
-      p.morphT = Math.min(1, p.morphT + 0.02);
+      p.morphT = Math.min(1, p.morphT + 0.008);
       const ease = p.morphT * p.morphT * (3 - 2 * p.morphT); // smoothstep
 
       const fromX = p.baseX;
@@ -239,6 +253,10 @@ function setPhase(phase) {
   // 상태에 따라 배경 비주얼과 텍스트 세팅
   switch (phase) {
     case "A0-1": // 대기
+      // 힌트 다시 보이게
+      if (standbyHintEl) {
+        standbyHintEl.style.display = "block";
+      }
       statusSystemEl.textContent = "IDLE";
       mainMessageEl.textContent = "장내자산관리공단입니다.";
       subMessageEl.textContent = "관람객 접근을 기다리고 있습니다.";
@@ -261,21 +279,80 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.45;
       break;
 
-    case "A1-1": // 착석 확인
-      statusSystemEl.textContent = "SEAT_DETECTED";
-      mainMessageEl.textContent = "착석이 확인되었습니다.";
-      subMessageEl.textContent = "장내 데이터 스캔을 시작합니다.";
-      secondaryMessageEl.textContent = "";
+    case "A1-1": // 착석 확인 = 자세 안내 화면
+      statusSystemEl.textContent = ""; // 상태 텍스트 안 씀
+
+      // 1) 시스템용 텍스트/상단/하단 UI 전부 숨기기
+      if (scanTopRowEl) scanTopRowEl.style.display = "none";
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
+      if (scanBottomEl) scanBottomEl.style.display = "none";
+      warningMessageEl.style.display = "none";
+      resultListEl.style.display = "none";
+
+      // 2) 자세 안내 전용 블록만 보이게
+      if (postureEl) postureEl.style.display = "flex";
+
+      // 3) 배경은 부드럽게
       scanBgEl.className = "scan-bg particles";
-      scanBgEl.style.opacity = 0.6;
+      scanBgEl.style.opacity = 0.5;
       break;
 
-    case "A1-2": // 기준 압력 캘리브레이션
-      statusSystemEl.textContent = "CALIBRATING";
+    case "POSTURE": // 착석 안내 화면
+      statusSystemEl.textContent = "";
+
+      // 시스템 UI 숨기기
+      if (scanTopRowEl) scanTopRowEl.style.display = "none";
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
+      if (scanBottomEl) scanBottomEl.style.display = "none";
+      if (sensorSimEl) sensorSimEl.style.display = "none";
+      warningMessageEl.style.display = "none";
+      resultListEl.style.display = "none";
+
+      // 인포그래픽 블럭 보이기
+      if (postureEl) postureEl.style.display = "flex";
+
+      // 배경
+      scanBgEl.className = "scan-bg particles";
+      scanBgEl.style.opacity = 0.6;
+
+      // 이전 타이머 모두 제거
+      postureTimers.forEach(clearTimeout);
+      postureTimers = [];
+
+      // 3줄 문구를 순차적으로 표시
+      const lines = [postureLine1El, postureLine2El, postureLine3El];
+      const delays = [0, 1500, 3000]; // ms
+
+      // 처음엔 모두 숨김
+      lines.forEach((el) => {
+        if (el) el.style.opacity = 0;
+      });
+
+      // 순차적으로 한 줄씩 나타나게
+      delays.forEach((delay, index) => {
+        const timerId = setTimeout(() => {
+          if (currentPhase !== "POSTURE") return;
+          const el = lines[index];
+          if (el) el.style.opacity = 1;
+        }, delay);
+        postureTimers.push(timerId);
+      });
+
+      break;
+
+    case "A1-2":
+      // 자세 안내 숨기기
+      if (postureEl) postureEl.style.display = "none";
+
+      // 상단/메인/하단 UI 다시 활성화
+      if (scanTopRowEl) scanTopRowEl.style.display = "flex";
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "block";
+      if (scanBottomEl) scanBottomEl.style.display = "flex";
+      if (sensorSimEl) sensorSimEl.style.display = "flex"; // 스캔 씬에서만 필요하면 남기고, 아니라면 지워
+
       mainMessageEl.textContent = "초기 상태를 측정하고 있습니다.";
       subMessageEl.textContent = "몇 초간 안정된 자세를 유지해 주세요.";
-      secondaryMessageEl.textContent =
-        "초기 압력값을 기준으로 정제 기준을 설정합니다.";
+      secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.7;
       break;
@@ -573,41 +650,27 @@ function onPressureChange(on) {
   lastPressureChangeTime = Date.now();
 
   if (on) {
-    // 착석: 먼저 파티클을 "장내자산관리공단" 글자로 응축시킴
+    // 터치/착석 시: 대기 화면 힌트 숨기고 바로 스캔 화면으로
     lastSitTime = Date.now();
 
-    // 아직은 A0-2 상태(standby 화면)에서 파티클만 모이게
-    startMorphToText();
+    if (standbyHintEl) {
+      standbyHintEl.style.display = "none";
+    }
 
-    // 약 1.5초 동안 글자 모이는 연출을 보여준 뒤,
-    // 스캔 UI(A1-1)로 전환
-    setTimeout(() => {
-      if (!pressureOn) return; // 중간에 일어나면 무시
-
-      setPhase("A1-1");
-      scanTimer = 0;
-      purity = 0;
-      updateProgress();
-
-      // 기존처럼 A1-1 → A1-2 전환
-      setTimeout(() => {
-        if (pressureOn && currentPhase === "A1-1") {
-          setPhase("A1-2");
-          scanTimer = 0;
-          purity = 0;
-          updateProgress();
-        }
-      }, 800);
-    }, 1500);
+    // ✅ 로고 모핑, 지연 전부 빼고 바로 스캔 초기화 단계로 진입
+    setPhase("A1-2");
+    scanTimer = 0;
+    purity = 0;
+    updateProgress();
   } else {
-    // 이탈
+    // 이탈 처리 (그대로 둔다)
     if (currentPhase.startsWith("B") || currentPhase === "A1-2") {
       setPhase("D1");
       scanTimer = 0;
       purity = 0;
       updateProgress();
     } else {
-      setPhase("A0-2"); // 접근은 되어 있고 착석만 해제된 상태 가정
+      setPhase("A0-2");
     }
   }
 }
@@ -674,3 +737,42 @@ updateSensorStatus();
 updateProgress();
 
 loopInterval = setInterval(mainLoopTick, 1000);
+
+// -----------------------------
+// 터치로 테스트: Standby 화면을 터치하면
+// 착석(압력센서 ON)과 동일하게 동작
+// -----------------------------
+let testTriggered = false;
+
+standbyScreenEl.addEventListener("click", () => {
+  // 대기 상태일 때만 작동하게
+  if (testTriggered) return;
+  if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+    testTriggered = true;
+
+    // ✅ 센서 대신, 바로 자세 유도 씬으로 전환
+    setPhase("POSTURE");
+    scanTimer = 0;
+    purity = 0;
+    updateProgress();
+  }
+});
+
+// -----------------------------
+// POSTURE 화면을 터치하면 스캔(A1-2)로 넘어가기
+// -----------------------------
+// -----------------------------
+// POSTURE 화면을 터치하면 스캔(A1-2)로 넘어가기
+// -----------------------------
+if (postureEl) {
+  postureEl.addEventListener("click", () => {
+    if (currentPhase !== "POSTURE") return;
+
+    // 나중에 압력센서 체크 들어갈 자리.
+    // 지금은 터치하면 곧바로 캘리브레이션 단계로 이동.
+    setPhase("A1-2");
+    scanTimer = 0;
+    purity = 0;
+    updateProgress();
+  });
+}
