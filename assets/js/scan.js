@@ -1152,7 +1152,3 @@ if (postureEl) {
     updateProgress();
   });
 }
-
-window.addEventListener("resize", () => {
-  resizeMicrobes();
-});
