@@ -25,6 +25,8 @@ let priceChart;
 let candleData = [];
 const MAX_CANDLES = 120;
 
+let lineData = [];
+
 let indicatorChart;
 let indicatorData = [];
 const MAX_INDICATOR_POINTS = 120;
@@ -681,7 +683,6 @@ function renderTick() {
   tickInfoEl.textContent = `Tick: ${tick}`;
 }
 
-// ====== 캔들 차트 ======
 function initPriceChart() {
   const canvas = document.getElementById("priceChart");
   if (!canvas) return;
@@ -693,6 +694,7 @@ function initPriceChart() {
   globalHigh = v;
   globalLow = v;
 
+  // 🔹 첫 번째 캔들 + 첫 번째 라인 포인트
   candleData = [
     {
       x: tick,
@@ -700,6 +702,12 @@ function initPriceChart() {
       h: v,
       l: v,
       c: v,
+    },
+  ];
+  lineData = [
+    {
+      x: tick,
+      y: v, // 종가 라인
     },
   ];
 
@@ -710,6 +718,7 @@ function initPriceChart() {
     data: {
       datasets: [
         {
+          type: "candlestick",
           label: asset.id,
           data: candleData,
           color: {
@@ -718,6 +727,15 @@ function initPriceChart() {
             unchanged: "#e5e7eb",
           },
           borderColor: "#e5e7eb",
+        },
+        {
+          type: "line", // 🔹 위에 그려질 라인
+          label: "Close",
+          data: lineData,
+          borderColor: "#facc15", // 노란 라인 (원하면 바꿔도 됨)
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0, // 0 = 직선, 0.3 정도 주면 살짝 곡선
         },
       ],
     },
@@ -748,7 +766,6 @@ function initPriceChart() {
   });
 }
 
-// 매 틱마다 새 캔들 추가
 function appendCandle() {
   const asset = getMainAsset();
   const open = asset.prevValue;
@@ -763,6 +780,7 @@ function appendCandle() {
   globalHigh = globalHigh === null ? high : Math.max(globalHigh, high);
   globalLow = globalLow === null ? low : Math.min(globalLow, low);
 
+  // 캔들 데이터
   candleData.push({
     x: tick,
     o: open,
@@ -770,15 +788,24 @@ function appendCandle() {
     l: low,
     c: close,
   });
-
   if (candleData.length > MAX_CANDLES) {
     candleData.shift();
+  }
+
+  // 🔹 라인 데이터 (close 기준)
+  lineData.push({
+    x: tick,
+    y: close,
+  });
+  if (lineData.length > MAX_CANDLES) {
+    lineData.shift();
   }
 }
 
 function updatePriceChart() {
   if (!priceChart) return;
-  priceChart.data.datasets[0].data = candleData;
+  priceChart.data.datasets[0].data = candleData; // 캔들
+  priceChart.data.datasets[1].data = lineData; // 🔹 라인
   priceChart.update("none");
 }
 

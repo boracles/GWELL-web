@@ -26,6 +26,19 @@ const postureLine4El = document.getElementById("postureLine4");
 const postureProgressInner = document.getElementById("postureProgressInner");
 const postureStepEls = document.querySelectorAll(".posture-step[data-step]");
 
+// 🔹 스캔 단계 시퀀스 (로딩바 밑 점 + 문장 1개)
+// HTML 쪽에 이런 구조가 있다고 가정:
+// <div id="scanSequence">
+//   <div id="scanSequenceText"></div>
+//   <div class="scan-sequence-steps">
+//     <div class="scan-step" data-scan-step="0"><span class="scan-step-check">✔</span></div>
+//     ...
+//   </div>
+// </div>
+const scanSequenceEl = document.getElementById("scanSequence");
+const scanSequenceTextEl = document.getElementById("scanSequenceText");
+const scanStepEls = document.querySelectorAll(".scan-step[data-scan-step]");
+
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
@@ -228,6 +241,62 @@ function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// -----------------------------
+// 스캔 단계용 문장 & 체크 (로딩바 연동)
+// -----------------------------
+const scanStepTexts = [
+  "장내 환경 전체 상태를 초기화하고 기준값을 측정하고 있습니다.",
+  "장내 미생물의 형태와 위치를 스캔하고 있습니다.",
+  "유익균·유해균 비율과 염증, 대사 지표를 분석하는 중입니다.",
+  "측정값을 사회적 정상성·효율성 지표로 환산하는 중입니다.",
+];
+
+let currentScanStep = -1;
+
+function updateScanSequence(ratio) {
+  if (!scanSequenceEl || !scanStepEls.length) return;
+
+  const isScanPhase =
+    currentPhase === "A1-2" ||
+    currentPhase === "B1" ||
+    currentPhase === "B2" ||
+    currentPhase === "B3" ||
+    currentPhase === "C1";
+
+  if (!isScanPhase) {
+    scanSequenceEl.style.display = "none";
+    currentScanStep = -1;
+    scanStepEls.forEach((el) => {
+      const check = el.querySelector(".scan-step-check");
+      el.classList.remove("completed");
+      if (check) check.style.opacity = "0";
+    });
+    if (scanSequenceTextEl) scanSequenceTextEl.textContent = "";
+    return;
+  }
+
+  scanSequenceEl.style.display = "block";
+
+  const stepCount = scanStepTexts.length;
+  let stepIndex = Math.floor(ratio * stepCount);
+  if (stepIndex < 0) stepIndex = 0;
+  if (stepIndex >= stepCount) stepIndex = stepCount - 1;
+
+  // 문장 업데이트 (한 번에 하나)
+  if (scanSequenceTextEl && stepIndex !== currentScanStep) {
+    scanSequenceTextEl.textContent = scanStepTexts[stepIndex];
+  }
+  currentScanStep = stepIndex;
+
+  // 체크 표시: 현재 스텝까지 채우기
+  scanStepEls.forEach((el, idx) => {
+    const check = el.querySelector(".scan-step-check");
+    const active = idx <= stepIndex;
+    el.classList.toggle("completed", active);
+    if (check) check.style.opacity = active ? "1" : "0";
+  });
 }
 
 // -----------------------------
@@ -496,7 +565,7 @@ function setPhase(phase) {
       scanTimer = 0;
       scanTotal = 30;
       purity = 0;
-      updateProgress();
+      updateProgress(); // ratio=0 → 첫 문장 + 첫 체크
 
       microProgress = 0.25;
       showMicrobes(true);
@@ -610,7 +679,7 @@ function updateSensorStatus() {
 }
 
 // -----------------------------
-// 진행바 업데이트
+// 진행바 업데이트 + 스캔 단계 연동
 // -----------------------------
 function updateProgress() {
   const ratio = Math.min(1, Math.max(0, scanTimer / scanTotal));
@@ -624,10 +693,23 @@ function updateProgress() {
   const remaining = Math.max(0, scanTotal - scanTimer);
   remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
   statusTimerEl.textContent = formatTime(scanTimer);
+
+  // 🔹 스캔 단계 문장 + 체크는 항상 로딩바 기준으로
+  if (
+    currentPhase === "A1-2" ||
+    currentPhase === "B1" ||
+    currentPhase === "B2" ||
+    currentPhase === "B3" ||
+    currentPhase === "C1"
+  ) {
+    updateScanSequence(ratio);
+  } else {
+    updateScanSequence(0);
+  }
 }
 
 // -----------------------------
-// 3D 미생물 씬
+// 3D 미생물 씬 (그대로)
 // -----------------------------
 const scanMicrobesCanvas = document.getElementById("scanMicrobes");
 
@@ -849,7 +931,7 @@ function showMicrobes(active) {
 }
 
 // -----------------------------
-// 분석 결과 & ID 카드 생성
+// 분석 결과 & ID 카드 생성 (이하 동일)
 // -----------------------------
 
 let scanResultStarted = false;

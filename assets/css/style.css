@@ -1602,15 +1602,14 @@ body {
 
 .chart-main {
   background: #140823;
-  border-radius: 0px;
+  border-radius: 0;
   opacity: 0.6;
   border: none;
-  padding: 0px 0px 10px;
+  padding: 0 0 8px; /* 🔹 좌우 패딩 제거 */
   height: 320px;
 }
 
 .chart-main canvas {
-  display: block;
   width: 100% !important;
   height: 100% !important;
 }
