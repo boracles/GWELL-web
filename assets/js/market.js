@@ -17,6 +17,7 @@ let tickerMetaEl;
 let statOpenEl, statHighEl, statLowEl, stat52HighEl, stat52LowEl;
 let stripIdEl, stripRefEl, marketTimeEl;
 let metricPurityEl, metricEfficiencyEl, metricContributionEl, metricLevelEl;
+let comparisonBodyEl;
 
 // 캔들 차트 + 인디케이터 데이터
 let priceChart;
@@ -75,6 +76,86 @@ const assets = [
     D: 0.4,
     B: 0.5,
     P: 0.8,
+  },
+  {
+    id: "GA-05",
+    name: "야근에 적응한 장",
+    theme: "생산성",
+    value: 102,
+    prevValue: 102,
+    D: 0.55,
+    B: 0.45,
+    P: 0.35,
+  },
+  {
+    id: "GA-06",
+    name: "돌봄을 나누는 장",
+    theme: "돌봄",
+    value: 97,
+    prevValue: 97,
+    D: 0.65,
+    B: 0.55,
+    P: 0.4,
+  },
+  {
+    id: "GA-07",
+    name: "정상성에서 벗어난 장",
+    theme: "순응/정상성",
+    value: 92,
+    prevValue: 92,
+    D: 0.5,
+    B: 0.35,
+    P: 0.6,
+  },
+  {
+    id: "GA-08",
+    name: "조용히 저항하는 장",
+    theme: "저항",
+    value: 90,
+    prevValue: 90,
+    D: 0.45,
+    B: 0.5,
+    P: 0.7,
+  },
+  {
+    id: "GA-09",
+    name: "성과에 최적화된 장",
+    theme: "생산성",
+    value: 115,
+    prevValue: 115,
+    D: 0.7,
+    B: 0.5,
+    P: 0.25,
+  },
+  {
+    id: "GA-10",
+    name: "돌봄을 포기한 장",
+    theme: "돌봄",
+    value: 85,
+    prevValue: 85,
+    D: 0.4,
+    B: 0.45,
+    P: 0.55,
+  },
+  {
+    id: "GA-11",
+    name: "완벽한 정상성을 추구하는 장",
+    theme: "순응/정상성",
+    value: 118,
+    prevValue: 118,
+    D: 0.6,
+    B: 0.6,
+    P: 0.2,
+  },
+  {
+    id: "GA-12",
+    name: "불안하지만 살아있는 장",
+    theme: "저항",
+    value: 93,
+    prevValue: 93,
+    D: 0.5,
+    B: 0.4,
+    P: 0.75,
   },
 ];
 
@@ -293,15 +374,32 @@ function renderComparisonTable() {
 
   comparisonBodyEl.innerHTML = "";
 
-  assets.forEach((asset) => {
-    const m = computeScanParams(asset);
-    const delta = asset.value - asset.prevValue;
-    const deltaLabel = (delta >= 0 ? "+" : "") + formatNumber(delta);
+  // 1) 현재 자산 배열을 복사해서
+  const rows = assets
+    .map((asset) => {
+      const m = computeScanParams(asset);
+      const delta = asset.value - asset.prevValue;
+      const deltaLabel = (delta >= 0 ? "+" : "") + formatNumber(delta);
 
-    let deltaClass = "neutral";
-    if (delta > 0.05) deltaClass = "up";
-    else if (delta < -0.05) deltaClass = "down";
+      let deltaClass = "neutral";
+      if (delta > 0.05) deltaClass = "up";
+      else if (delta < -0.05) deltaClass = "down";
 
+      return {
+        asset,
+        m,
+        delta,
+        deltaLabel,
+        deltaClass,
+      };
+    })
+    // 2) Value 기준으로 내림차순 정렬 (가치 높은 순)
+    .sort((a, b) => b.asset.value - a.asset.value)
+    // 3) 화면에 보여줄 최대 줄 수만 남기기 (예: 8줄)
+    .slice(0, 8); // ← 여기 숫자 조절하면 화면에 보이는 줄 수 조정 가능
+
+  rows.forEach((row) => {
+    const { asset, m, deltaLabel, deltaClass } = row;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${asset.id}</td>
@@ -594,6 +692,8 @@ function init() {
   metricEfficiencyEl = document.getElementById("metricEfficiency");
   metricContributionEl = document.getElementById("metricContribution");
   metricLevelEl = document.getElementById("metricLevel");
+
+  comparisonBodyEl = document.getElementById("comparisonBody"); // ✅ 추가
 
   // 상단 시간 표시
   if (marketTimeEl) {

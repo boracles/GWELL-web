@@ -84,6 +84,258 @@ const btnReset = document.getElementById("btnReset");
 const textCanvas = document.createElement("canvas");
 const textCtx = textCanvas.getContext("2d");
 
+// 🔹 미생물 3D 씬 관련 -------------------------
+let microScene, microCamera, microRenderer;
+let microGroup;
+let microAnimReq = null;
+let microStartTime = performance.now();
+let microIsActive = false;
+let microLoaded = false;
+
+const scanMicrobesCanvas = document.getElementById("scanMicrobes");
+
+function initMicrobeScene() {
+  if (!scanMicrobesCanvas) return;
+  if (microScene) return; // 이미 초기화 됐으면 다시 안 함
+
+  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
+  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+
+  microRenderer = new THREE.WebGLRenderer({
+    canvas: scanMicrobesCanvas,
+    alpha: true,
+    antialias: true,
+  });
+  microRenderer.setSize(width, height);
+  microRenderer.setPixelRatio(window.devicePixelRatio || 1);
+
+  microScene = new THREE.Scene();
+  microScene.fog = new THREE.FogExp2(0x050816, 0.008);
+
+  microCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+  microCamera.position.set(0, 0, 26);
+
+  // 소프트한 조명
+  const amb = new THREE.AmbientLight(0xffffff, 0.6);
+  microScene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(5, 10, 7);
+  microScene.add(dir);
+
+  microGroup = new THREE.Group();
+  microScene.add(microGroup);
+
+  // 🔹 여기서 GLB 로드
+  const loader = new THREE.GLTFLoader();
+  loader.load(
+    "assets/models/microbe.glb", // 👉 네 모델 경로로 바꿔도 됨
+    (gltf) => {
+      const base = gltf.scene;
+      base.traverse((obj) => {
+        if (obj.isMesh) {
+          obj.castShadow = false;
+          obj.receiveShadow = false;
+          // 필요하면 roughness/metalness 조정 가능
+        }
+      });
+
+      const count = 60; // 미생물 개수
+      for (let i = 0; i < count; i++) {
+        // 개별 미생물을 감싸는 그룹 하나씩 만들기
+        const wrapper = new THREE.Group();
+        const clone = base.clone(true);
+        wrapper.add(clone);
+
+        // 구체 껍질 안에 랜덤 배치
+        const radius = 7 + Math.random() * 4;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+
+        const x = radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.sin(phi) * Math.sin(theta);
+        const z = radius * Math.cos(phi);
+
+        wrapper.position.set(x, y, z);
+
+        const s = 0.5 + Math.random() * 0.8;
+        wrapper.scale.set(s, s, s);
+
+        wrapper.userData = {
+          basePos: wrapper.position.clone(),
+          baseScale: s,
+          offset: Math.random() * 1000,
+          swirlDir: Math.random() > 0.5 ? 1 : -1,
+        };
+
+        microGroup.add(wrapper);
+      }
+
+      microLoaded = true;
+      // 스캔 중이라면 로딩 끝난 순간 바로 보여주기
+      if (microIsActive) {
+        scanMicrobesCanvas.style.opacity = 0.9;
+      }
+    },
+    undefined,
+    (err) => {
+      console.error("microbe glb load error:", err);
+    }
+  );
+
+  microStartTime = performance.now();
+}
+
+function initMicrobeScene() {
+  if (!scanMicrobesCanvas || microScene) return;
+
+  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
+  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+
+  microRenderer = new THREE.WebGLRenderer({
+    canvas: scanMicrobesCanvas,
+    alpha: true,
+    antialias: true,
+  });
+  microRenderer.setSize(width, height);
+  microRenderer.setPixelRatio(window.devicePixelRatio || 1);
+
+  microScene = new THREE.Scene();
+  microScene.fog = new THREE.FogExp2(0x050816, 0.008);
+
+  microCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+  microCamera.position.set(0, 0, 26);
+
+  // 소프트한 조명
+  const amb = new THREE.AmbientLight(0xffffff, 0.6);
+  microScene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(5, 10, 7);
+  microScene.add(dir);
+
+  // 🔹 미생물 형태 (긴 캡슐 모양)
+  const bodyGeo = new THREE.CapsuleGeometry(0.5, 2.2, 8, 16);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0xa855f7,
+    emissive: 0x6d28d9,
+    roughness: 0.35,
+    metalness: 0.15,
+  });
+
+  microGroup = new THREE.Group();
+  microScene.add(microGroup);
+
+  const count = 70; // 미생물 개수
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(bodyGeo, bodyMat.clone());
+    const radius = 7 + Math.random() * 4;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1); // 균일 분포
+
+    const x = radius * Math.sin(phi) * Math.cos(theta);
+    const y = radius * Math.sin(phi) * Math.sin(theta);
+    const z = radius * Math.cos(phi);
+
+    m.position.set(x, y, z);
+
+    const s = 0.6 + Math.random() * 0.9;
+    m.scale.set(s, s * 1.6, s);
+
+    m.userData = {
+      basePos: m.position.clone(),
+      baseScale: s,
+      offset: Math.random() * 1000,
+      swirlDir: Math.random() > 0.5 ? 1 : -1,
+    };
+
+    microGroup.add(m);
+  }
+
+  microStartTime = performance.now();
+}
+
+// 리사이즈 대응
+function resizeMicrobes() {
+  if (!microRenderer || !microCamera) return;
+  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
+  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+  microRenderer.setSize(width, height);
+  microCamera.aspect = width / height;
+  microCamera.updateProjectionMatrix();
+}
+
+window.addEventListener("resize", () => {
+  resizeMicrobes();
+});
+
+// 애니메이션 루프
+function animateMicrobes() {
+  if (!microScene || !microCamera || !microRenderer || !microGroup) return;
+
+  const now = performance.now();
+  const t = (now - microStartTime) * 0.001;
+
+  microGroup.children.forEach((m, idx) => {
+    const d = m.userData;
+    const wobble = Math.sin(t * 1.2 + d.offset) * 0.4;
+    const wobble2 = Math.cos(t * 0.9 + d.offset * 1.3) * 0.4;
+
+    const r = d.basePos.length();
+    const phase = t * 0.25 + d.offset * 0.1 * d.swirlDir;
+
+    const x = r * Math.sin(phase) * Math.cos(d.offset);
+    const y = r * Math.sin(phase) * Math.sin(d.offset);
+    const z = r * Math.cos(phase);
+
+    m.position.set(
+      x + wobble * 0.8,
+      y + wobble2 * 0.8,
+      z + Math.sin(t * 0.7 + d.offset) * 0.6
+    );
+
+    // 살짝 회전
+    m.rotation.x += 0.01 * d.swirlDir;
+    m.rotation.y += 0.013;
+
+    // 숨쉬듯이 스케일 변화
+    const breath = 1 + Math.sin(t * 1.5 + d.offset) * 0.15;
+    m.scale.set(
+      d.baseScale * breath,
+      d.baseScale * 1.6 * breath,
+      d.baseScale * breath
+    );
+  });
+
+  microGroup.rotation.y = Math.sin(t * 0.15) * 0.35;
+
+  microRenderer.render(microScene, microCamera);
+  microAnimReq = requestAnimationFrame(animateMicrobes);
+}
+
+// 스캔 ON/OFF 시 제어
+function showMicrobes(active) {
+  microIsActive = active;
+
+  if (!scanMicrobesCanvas) return;
+
+  if (active) {
+    initMicrobeScene();
+    resizeMicrobes();
+    scanMicrobesCanvas.style.opacity = 0.9;
+
+    if (!microAnimReq) {
+      microStartTime = performance.now();
+      microAnimReq = requestAnimationFrame(animateMicrobes);
+    }
+  } else {
+    scanMicrobesCanvas.style.opacity = 0;
+
+    if (microAnimReq) {
+      cancelAnimationFrame(microAnimReq);
+      microAnimReq = null;
+    }
+  }
+}
+
 function buildTextTargets(text) {
   const w = standbyCanvas.width;
   const h = standbyCanvas.height;
@@ -273,6 +525,7 @@ function setPhase(phase) {
       progressLabelEl.textContent = "스캔 대기";
       purity = 0;
       updateProgress();
+      showMicrobes(false);
       break;
 
     case "A0-2": // 접근 감지
@@ -283,6 +536,7 @@ function setPhase(phase) {
         "장내자산관리공단입니다. 착석하시면 장내 데이터 스캔이 시작됩니다.";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.45;
+      showMicrobes(false);
       break;
 
     case "A1-1": // 착석 확인 = 자세 안내 화면
@@ -322,6 +576,9 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.6;
 
       const seqText = document.getElementById("postureSequenceText");
+      const postureGraphicEl = document.querySelector(".posture-graphic");
+      const postureTitleEl = document.querySelector(".posture-message");
+      const stepperEl = document.querySelector(".posture-stepper");
 
       // 🔹 4단계 문장
       const seq = [
@@ -334,7 +591,7 @@ function setPhase(phase) {
       let idx = 0;
       let currentProgress = 0;
 
-      // 🔥 여기서 완전 리셋 (체크/프로그레스/문장 모두)
+      // 🔥 여기서 완전 리셋
       if (seqText) {
         seqText.style.opacity = 0;
         seqText.innerText = "";
@@ -345,24 +602,44 @@ function setPhase(phase) {
       postureStepEls.forEach((el) => {
         el.classList.remove("completed");
         const check = el.querySelector(".posture-step-check");
-        if (check) {
-          check.style.opacity = "0"; // 혹시 남아 있는 스타일 강제 OFF
-        }
+        if (check) check.style.opacity = "0";
       });
+      if (stepperEl) {
+        stepperEl.style.opacity = 1;
+      }
+      // 그래픽·제목·부제 복구
+      if (postureGraphicEl) {
+        postureGraphicEl.style.display = "block";
+        postureGraphicEl.style.opacity = 1;
+      }
+      if (postureTitleEl) {
+        postureTitleEl.style.display = "block";
+        postureTitleEl.style.opacity = 1;
+      }
+      if (postureLine4El) {
+        postureLine4El.style.display = "block";
+        postureLine4El.style.opacity = 1;
+        postureLine4El.textContent =
+          "잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.";
+      }
 
-      // SVG 강조 애니메이션
-      function pumpSVG() {
+      // SVG 강조 애니메이션 (단계마다 강도 점점 ↑)
+      function pumpSVG(stepIndex) {
         const img = document.getElementById("postureImg");
         if (!img) return;
+        const base = 1.05;
+        const extra = stepIndex * 0.02; // 단계가 뒤로 갈수록 조금 더 세게
+        const scale = base + extra;
+
         img.style.transition = "transform 0.35s ease";
-        img.style.transform = "scale(1.08)";
+        img.style.transform = `scale(${scale})`;
         setTimeout(() => (img.style.transform = "scale(1.0)"), 350);
       }
 
       // 부드러운 로딩바 애니메이션
       function animateProgressTo(targetPercent, onDone) {
-        const duration = 900;
-        const interval = 40;
+        const duration = 1100;
+        const interval = 50;
         const steps = Math.floor(duration / interval);
         const start = currentProgress;
         const delta = (targetPercent - start) / steps;
@@ -389,26 +666,21 @@ function setPhase(phase) {
         postureTimers.push(id);
       }
 
+      // 스캔씬으로 넘어가기
       function goToScanPhase() {
-        // 마지막 단계 끝 → 장내 데이터 감지 문구 한 번 보여주고 스캔 단계로
-        if (postureLine4El) {
-          postureLine4El.textContent =
-            "장내 배출 신호를 감지했습니다. 장내 데이터 정렬을 시작합니다.";
-        }
-        setTimeout(() => {
-          setPhase("A1-2");
-          scanTimer = 0;
-          purity = 0;
-          updateProgress();
-        }, 1000);
+        setPhase("A1-2");
+        scanTimer = 0;
+        purity = 0;
+        updateProgress();
       }
 
       function nextSentence() {
         if (!seqText) return;
 
-        if (idx >= seq.length) {
-          // 네 번째 문장까지 끝나면 스캔으로 넘어갈 준비
-          goToScanPhase();
+        const lastIndex = seq.length - 1;
+
+        if (idx > lastIndex) {
+          // 이미 끝난 상태면 아무 것도 안 함
           return;
         }
 
@@ -416,36 +688,76 @@ function setPhase(phase) {
         seqText.innerText = seq[idx];
         seqText.style.opacity = 1;
 
-        // 2) 문장만 먼저 잠깐 보이기
+        // 2) 문장만 먼저 충분히 보이게 (1.4초)
         const t1 = setTimeout(() => {
-          // 3) SVG 강하게 한 번 펌핑
-          pumpSVG();
+          // 3) SVG 강하게 한 번 펌핑 (단계마다 강도 ↑)
+          pumpSVG(idx);
 
           // 4) 펌핑 끝난 뒤 로딩바 부드럽게 채우기
           const t2 = setTimeout(() => {
-            const target = ((idx + 1) / seq.length) * 100;
+            const target = ((idx + 1) / seq.length) * 100; // 25, 50, 75, 100
 
             animateProgressTo(target, () => {
               // 5) 로딩바가 해당 지점까지 다 채워진 뒤 → 그 지점에 체크
               if (postureStepEls && postureStepEls[idx]) {
                 postureStepEls[idx].classList.add("completed");
+                const check = postureStepEls[idx].querySelector(
+                  ".posture-step-check"
+                );
+                if (check) check.style.opacity = "1";
               }
 
-              // 6) 문장 페이드아웃
-              setTimeout(() => {
-                seqText.style.opacity = 0;
+              if (idx === lastIndex) {
+                // 🔚 마지막 단계: 여기까지 온 시점에서
+                // → 바는 100%, 체크 4개 모두 켜진 상태
 
-                // 7) 다음 문장으로
-                setTimeout(() => {
-                  idx++;
-                  nextSentence();
-                }, 400);
-              }, 700);
+                // 5-1) 잠깐 여운 (0.8초)
+                const afterFullTimer = setTimeout(() => {
+                  // 5-2) 인포그래픽 / 제목 / 부제 / 스텝퍼 전부 사라짐
+                  if (postureGraphicEl) postureGraphicEl.style.display = "none";
+                  if (stepperEl) stepperEl.style.opacity = 0;
+                  if (postureTitleEl) postureTitleEl.style.opacity = 0;
+                  if (postureLine4El) postureLine4El.style.opacity = 0;
+
+                  // 5-3) 문장 영역을 감지 문구로 교체
+                  seqText.style.opacity = 0;
+                  const showDetectTimer = setTimeout(() => {
+                    seqText.innerText =
+                      "장내 배출 데이터가 감지되었습니다. 장내 데이터 정렬을 시작합니다.";
+                    seqText.style.opacity = 1;
+                  }, 400);
+
+                  postureTimers.push(showDetectTimer);
+
+                  // 5-4) 감지 문장만 충분히 보여준 뒤(3초) 스캔씬으로 이동
+                  const toScanTimer = setTimeout(() => {
+                    goToScanPhase();
+                  }, 3400); // 0.4 + 3.0
+
+                  postureTimers.push(toScanTimer);
+                }, 800);
+
+                postureTimers.push(afterFullTimer);
+              } else {
+                // 🔁 중간 단계들: 문장 사라지고 다음 문장으로
+                const tFadeOut = setTimeout(() => {
+                  seqText.style.opacity = 0;
+
+                  // 문장 사이 텀 조금 더 길게 (0.9초)
+                  const tNext = setTimeout(() => {
+                    idx++;
+                    nextSentence();
+                  }, 900);
+                  postureTimers.push(tNext);
+                }, 900);
+
+                postureTimers.push(tFadeOut);
+              }
             });
-          }, 400);
+          }, 500); // 펌핑 이후 숨 고르기
 
           postureTimers.push(t2);
-        }, 900);
+        }, 1400); // 문장만 먼저 보이는 시간
 
         postureTimers.push(t1);
       }
@@ -473,6 +785,7 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.7;
+      showMicrobes(false);
       break;
 
     case "B1": // 안정화
@@ -482,6 +795,7 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.6;
+      showMicrobes(false);
       break;
 
     case "B2": // 힘 주기
@@ -491,6 +805,7 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.65;
+      showMicrobes(false);
       break;
 
     case "B3": // 힘 풀고 안정
@@ -500,6 +815,7 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg noise";
       scanBgEl.style.opacity = 0.6;
+      showMicrobes(false);
       break;
 
     case "C1": // 응축 + 완료 알림
@@ -509,6 +825,7 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.8;
+      showMicrobes(false);
       break;
 
     case "C2": // 결과 화면
@@ -519,6 +836,7 @@ function setPhase(phase) {
         "이 장내 데이터를 사회 자산으로 상장하시겠습니까?";
       decisionButtonsEl.style.display = "flex";
       renderAnalysisResult();
+      showMicrobes(false);
       break;
 
     case "C3": // YES 상장 진행
@@ -559,6 +877,7 @@ function setPhase(phase) {
         "시스템 점검이 필요하면 직원에게 말씀해 주세요.";
       scanBgEl.className = "scan-bg noise";
       scanBgEl.style.opacity = 0.5;
+      showMicrobes(false);
       break;
 
     default:
@@ -879,9 +1198,6 @@ standbyScreenEl.addEventListener("click", () => {
 // -----------------------------
 // POSTURE 화면을 터치하면 스캔(A1-2)로 넘어가기
 // -----------------------------
-// -----------------------------
-// POSTURE 화면을 터치하면 스캔(A1-2)로 넘어가기
-// -----------------------------
 if (postureEl) {
   postureEl.addEventListener("click", () => {
     if (currentPhase !== "POSTURE") return;
@@ -893,4 +1209,80 @@ if (postureEl) {
     purity = 0;
     updateProgress();
   });
+}
+
+function resizeMicrobes() {
+  if (!microRenderer || !microCamera) return;
+  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
+  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+  microRenderer.setSize(width, height);
+  microCamera.aspect = width / height;
+  microCamera.updateProjectionMatrix();
+}
+
+window.addEventListener("resize", () => {
+  resizeMicrobes();
+});
+
+function animateMicrobes() {
+  if (!microScene || !microCamera || !microRenderer || !microGroup) return;
+
+  const now = performance.now();
+  const t = (now - microStartTime) * 0.001;
+
+  microGroup.children.forEach((wrapper) => {
+    const d = wrapper.userData;
+    const wobble = Math.sin(t * 1.2 + d.offset) * 0.4;
+    const wobble2 = Math.cos(t * 0.9 + d.offset * 1.3) * 0.4;
+
+    const r = d.basePos.length();
+    const phase = t * 0.25 + d.offset * 0.1 * d.swirlDir;
+
+    const x = r * Math.sin(phase) * Math.cos(d.offset);
+    const y = r * Math.sin(phase) * Math.sin(d.offset);
+    const z = r * Math.cos(phase);
+
+    wrapper.position.set(
+      x + wobble * 0.8,
+      y + wobble2 * 0.8,
+      z + Math.sin(t * 0.7 + d.offset) * 0.6
+    );
+
+    // 전체 미생물이 살짝 회전
+    wrapper.rotation.x += 0.01 * d.swirlDir;
+    wrapper.rotation.y += 0.013;
+
+    // 숨쉬는 스케일 변화
+    const breath = 1 + Math.sin(t * 1.5 + d.offset) * 0.15;
+    const s = d.baseScale * breath;
+    wrapper.scale.set(s, s, s);
+  });
+
+  microGroup.rotation.y = Math.sin(t * 0.15) * 0.35;
+
+  microRenderer.render(microScene, microCamera);
+  microAnimReq = requestAnimationFrame(animateMicrobes);
+}
+function showMicrobes(active) {
+  microIsActive = active;
+  if (!scanMicrobesCanvas) return;
+
+  if (active) {
+    initMicrobeScene();
+    resizeMicrobes();
+
+    // 모델이 이미 로드된 상태면 바로 보이게
+    scanMicrobesCanvas.style.opacity = microLoaded ? 0.9 : 0.0;
+
+    if (!microAnimReq) {
+      microStartTime = performance.now();
+      microAnimReq = requestAnimationFrame(animateMicrobes);
+    }
+  } else {
+    scanMicrobesCanvas.style.opacity = 0;
+    if (microAnimReq) {
+      cancelAnimationFrame(microAnimReq);
+      microAnimReq = null;
+    }
+  }
 }

@@ -10,6 +10,10 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
     <script src="assets/js/supabase-init.js"></script>
     <script src="assets/js/scan.js" defer></script>
+    <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.161.0/examples/js/loaders/GLTFLoader.js"></script>
+
     <style>
       /* 이 페이지 전용 약간의 추가 스타일 (필요하면 style.css로 옮겨도 됨) */
       .scan-root {
@@ -268,6 +272,9 @@
       <div class="scan-root" id="scanRoot">
         <div class="scan-main">
           <div class="scan-bg particles" id="scanBg"></div>
+
+          <!-- 🔹 3D 미생물 레이어 -->
+          <canvas id="scanMicrobes"></canvas>
 
           <div class="scan-content">
             <div class="scan-posture" id="scanPosture" style="display: none">
