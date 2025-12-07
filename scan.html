@@ -4,15 +4,22 @@
     <meta charset="UTF-8" />
     <title>장내자산 스캔 — Scan</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <link rel="stylesheet" href="assets/css/style.css" />
 
-    <!-- Supabase UMD -->
+    <script type="module">
+      import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+      import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+
+      // 전역에서 scan.js가 접근할 수 있게
+      window.THREE = THREE;
+      window.GLTFLoader = GLTFLoader;
+    </script>
+
+    <!-- Supabase -->
     <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
     <script src="assets/js/supabase-init.js"></script>
-    <script src="assets/js/scan.js" defer></script>
-    <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.161.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="assets/js/scan.js"></script>
 
     <style>
       /* 이 페이지 전용 약간의 추가 스타일 (필요하면 style.css로 옮겨도 됨) */

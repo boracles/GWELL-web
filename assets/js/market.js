@@ -2,7 +2,7 @@
 
 // ====== 기본 설정 ======
 const TICK_INTERVAL_MS = 5000;
-const ISSUE_CHANGE_EVERY = 3;
+const ISSUE_CHANGE_EVERY = 12;
 
 let tick = 0;
 let currentIssue = null;
@@ -640,7 +640,7 @@ function step() {
   tick++;
 
   // 이슈 변경
-  if (tick === 1 || tick % ISSUE_CHANGE_EVERY === 0) {
+  if (tick % ISSUE_CHANGE_EVERY === 0) {
     currentIssue = pickNewIssue(currentIssue);
     renderIssue(currentIssue);
     renderWeights(currentIssue);

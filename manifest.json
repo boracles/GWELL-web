@@ -1,0 +1,13 @@
+{
+  "name": "My WebApp",
+  "short_name": "App",
+  "display": "standalone",
+  "start_url": "/market.html",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ]
+}

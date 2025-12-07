@@ -25,7 +25,7 @@ body {
 
 /* 색상 토큰 비슷하게 */
 :root {
-  --bg-dark: #020617;
+  --bg-dark: #000000;
   --bg-panel: rgba(15, 23, 42, 0.9);
   --border-soft: rgba(148, 163, 184, 0.4);
   --accent: #6d5dfc;
@@ -393,7 +393,7 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0; /* 기본은 숨겨놓기 */
+  opacity: 0; /* 기본은 숨김 */
   transition: opacity 0.6s ease;
 }
 
@@ -526,13 +526,14 @@ body {
 
 .issue-bar {
   padding: 8px 20px;
-  background: rgba(15, 23, 42, 0.95);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;   /* 마켓에서는 .issue-bar--market이 덮어씀 */
+  border-bottom: none;       /* 🔹 기본 라인 제거 */
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 
 .issue-tag {
   display: inline-block;
@@ -952,11 +953,23 @@ body {
    Market 페이지 – 주식창 레이아웃
 ========================== */
 
+.market-logo {
+  display: flex;
+  align-items: center;
+}
+
+/* 로고 이미지 크기 조절용 */
+.market-logo-img {
+  height: 64px; /* 네가 설정한 값 그대로 */
+  width: auto;
+  display: block;
+}
+
 .market-body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, system-ui, "Noto Sans KR",
     sans-serif;
-  background: #020617;
+  background: #000000;
   color: #e5e7eb;
 }
 
@@ -965,23 +978,26 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #020617;
+  background: #000000;
 }
 
 /* 상단 로고 바 */
 .market-header {
-  height: 44px;
+  height: 96px;           /* 로고 64px 기준 */
   padding: 0 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: #020617;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+  justify-content: center; /* 로고 가운데 정렬 */
+  background: #000000;     /* 🔹 여기! 검정으로 */
+  border-bottom: none;
+  position: relative;      /* 시계 absolute 배치용 */
 }
 
+
 .market-logo {
-  font-size: 14px;
-  letter-spacing: 0.16em;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 🔹 로고 자체도 가운데 정렬 */
 }
 
 .market-logo-sub {
@@ -991,15 +1007,20 @@ body {
 }
 
 .market-header-right {
+  position: absolute;         /* 🔹 헤더 안에서 절대 배치 */
+  right: 24px;                /* 오른쪽 여백 */
+  top: 0%;                   /* 세로 가운데 정렬 */
+  transform: translateY(-50%);
   font-size: 11px;
   opacity: 0.7;
 }
+
 
 /* 얇은 정보 스트립 */
 .market-strip {
   height: 26px;
   padding: 0 18px;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: space-between;
   background: #050816;
@@ -1030,13 +1051,14 @@ body {
 
 /* 이슈/뉴스 바 – 크게 */
 .issue-bar--market {
-  padding: 10px 24px;
-  background: rgba(15, 23, 42, 0.95);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+  padding: 12px 24px; /* 🔹 약간 여유 있게 */
+  background: #202021
+  border-bottom: none; /* 🔹 아래 라인 제거 */
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 10px;
+  align-items: center;
   font-size: 14px;
+  margin-bottom: 4px;
 }
 
 .issue-tag {
@@ -1229,7 +1251,7 @@ body {
   font-size: 10px;
   opacity: 0.7;
   text-align: center;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  border-top: none; /* 🔹 여기 */
   padding-top: 4px;
 }
 
@@ -1248,7 +1270,7 @@ section {
   margin-top: 0;
   background: #020617;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: none;
   padding: 4px 10px 6px;
 }
 

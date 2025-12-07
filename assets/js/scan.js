@@ -88,11 +88,167 @@ const textCtx = textCanvas.getContext("2d");
 let microScene, microCamera, microRenderer;
 let microGroup;
 let microAnimReq = null;
-let microStartTime = performance.now();
+let microStartTime = 0;
 let microIsActive = false;
-let microLoaded = false;
 
 const scanMicrobesCanvas = document.getElementById("scanMicrobes");
+const MICRO_MODEL_PATH = "assets/models/Microbiome_1.glb"; // 네 glb 경로
+
+function initMicrobeScene() {
+  if (!scanMicrobesCanvas) return;
+  if (microScene) return; // 이미 만들어졌으면 다시 안 함
+
+  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
+  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+
+  microRenderer = new THREE.WebGLRenderer({
+    canvas: scanMicrobesCanvas,
+    alpha: true,
+    antialias: true,
+  });
+  microRenderer.setSize(width, height);
+  microRenderer.setPixelRatio(window.devicePixelRatio || 1);
+
+  microScene = new THREE.Scene();
+  microScene.fog = new THREE.FogExp2(0x050816, 0.008);
+
+  microCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+  microCamera.position.set(0, 0, 26);
+
+  const amb = new THREE.AmbientLight(0xffffff, 0.6);
+  microScene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(5, 10, 7);
+  microScene.add(dir);
+
+  microGroup = new THREE.Group();
+  microScene.add(microGroup);
+
+  const loader = new GLTFLoader(); // 🔹 THREE.GLTFLoader 아님!
+
+  loader.load(
+    MICRO_MODEL_PATH,
+    (gltf) => {
+      const base = gltf.scene;
+      base.traverse((obj) => {
+        if (obj.isMesh) {
+          obj.castShadow = false;
+          obj.receiveShadow = false;
+        }
+      });
+
+      const COUNT = 60; // 미생물 개수
+      for (let i = 0; i < COUNT; i++) {
+        const wrapper = new THREE.Group();
+        const clone = base.clone(true);
+        wrapper.add(clone);
+
+        const radius = 7 + Math.random() * 4;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+
+        const x = radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.sin(phi) * Math.sin(theta);
+        const z = radius * Math.cos(phi);
+
+        wrapper.position.set(x, y, z);
+
+        const baseScale = 0.4 + Math.random() * 0.8;
+        wrapper.scale.set(baseScale, baseScale, baseScale);
+
+        wrapper.userData = {
+          basePos: wrapper.position.clone(),
+          baseScale,
+          offset: Math.random() * 1000,
+          swirlDir: Math.random() > 0.5 ? 1 : -1,
+        };
+
+        microGroup.add(wrapper);
+      }
+
+      if (microIsActive) {
+        scanMicrobesCanvas.style.opacity = 0.9;
+      }
+    },
+    undefined,
+    (err) => {
+      console.error("microbe glb load error:", err);
+    }
+  );
+
+  microStartTime = performance.now();
+}
+
+function resizeMicrobes() {
+  if (!microRenderer || !microCamera) return;
+  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
+  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+  microRenderer.setSize(width, height);
+  microCamera.aspect = width / height;
+  microCamera.updateProjectionMatrix();
+}
+
+window.addEventListener("resize", resizeMicrobes);
+
+function animateMicrobes() {
+  if (!microScene || !microCamera || !microRenderer || !microGroup) return;
+
+  const now = performance.now();
+  const t = (now - microStartTime) * 0.001;
+
+  microGroup.children.forEach((wrapper) => {
+    const d = wrapper.userData;
+    const wobble = Math.sin(t * 1.2 + d.offset) * 0.4;
+    const wobble2 = Math.cos(t * 0.9 + d.offset * 1.3) * 0.4;
+
+    const r = d.basePos.length();
+    const phase = t * 0.25 + d.offset * 0.1 * d.swirlDir;
+
+    const x = r * Math.sin(phase) * Math.cos(d.offset);
+    const y = r * Math.sin(phase) * Math.sin(d.offset);
+    const z = r * Math.cos(phase);
+
+    wrapper.position.set(
+      x + wobble * 0.8,
+      y + wobble2 * 0.8,
+      z + Math.sin(t * 0.7 + d.offset) * 0.6
+    );
+
+    wrapper.rotation.x += 0.01 * d.swirlDir;
+    wrapper.rotation.y += 0.013;
+
+    const breath = 1 + Math.sin(t * 1.5 + d.offset) * 0.15;
+    const s = d.baseScale * breath;
+    wrapper.scale.set(s, s, s);
+  });
+
+  microGroup.rotation.y = Math.sin(t * 0.15) * 0.35;
+
+  microRenderer.render(microScene, microCamera);
+  microAnimReq = requestAnimationFrame(animateMicrobes);
+}
+
+function showMicrobes(active) {
+  microIsActive = active;
+  if (!scanMicrobesCanvas) return;
+
+  if (active) {
+    initMicrobeScene();
+    resizeMicrobes();
+    scanMicrobesCanvas.style.opacity = 0.9;
+
+    if (!microAnimReq) {
+      microStartTime = performance.now();
+      microAnimReq = requestAnimationFrame(animateMicrobes);
+    }
+  } else {
+    scanMicrobesCanvas.style.opacity = 0;
+    if (microAnimReq) {
+      cancelAnimationFrame(microAnimReq);
+      microAnimReq = null;
+    }
+  }
+}
 
 function initMicrobeScene() {
   if (!scanMicrobesCanvas) return;
@@ -795,7 +951,8 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.6;
-      showMicrobes(false);
+
+      showMicrobes(true); // ✅ 여기 켜져 있어야 함
       break;
 
     case "B2": // 힘 주기
@@ -805,7 +962,8 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.65;
-      showMicrobes(false);
+
+      showMicrobes(true);
       break;
 
     case "B3": // 힘 풀고 안정
@@ -815,7 +973,8 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg noise";
       scanBgEl.style.opacity = 0.6;
-      showMicrobes(false);
+
+      showMicrobes(true);
       break;
 
     case "C1": // 응축 + 완료 알림
@@ -825,7 +984,8 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.8;
-      showMicrobes(false);
+
+      showMicrobes(true);
       break;
 
     case "C2": // 결과 화면
@@ -836,6 +996,7 @@ function setPhase(phase) {
         "이 장내 데이터를 사회 자산으로 상장하시겠습니까?";
       decisionButtonsEl.style.display = "flex";
       renderAnalysisResult();
+
       showMicrobes(false);
       break;
 
@@ -997,8 +1158,9 @@ function startMorphToText() {
 // -----------------------------
 function mainLoopTick() {
   // 센서 예외 처리 (중도 이탈)
-  if (pressureOn === false && currentPhase.startsWith("B")) {
-    // 2초 이상 이탈 같은 복잡한 로직은 실제 센서로 구현
+  const USE_PRESSURE_GUARD = false; // 👉 나중에 센서 붙이면 true로 바꿔
+
+  if (USE_PRESSURE_GUARD && !pressureOn && currentPhase.startsWith("B")) {
     setPhase("D1");
     scanTimer = 0;
     purity = 0;
