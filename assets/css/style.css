@@ -1230,7 +1230,7 @@ body {
 .ticker-row {
   display: grid;
   grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.3fr) minmax(0, 1.5fr);
-  gap: 20px;
+  gap: 40px;
   align-items: flex-start;
 }
 
@@ -1238,53 +1238,90 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 4px 0 6px;
+  padding: 6px 0 10px;
 }
 
+/* 시세/파라미터 good/bad 색 클래스 */
+
+.stat-good {
+  color: #22c55e; /* 좋은 쪽: 초록 */
+}
+
+.stat-bad {
+  color: #f97373; /* 나쁜 쪽: 빨강 */
+}
+
+.stat-warn {
+  color: #fbbf24; /* 애매/주의: 노랑 */
+}
+
+/* 정제율/기여도 같은 파라미터에도 재사용 */
+.metric-good {
+  color: #0fedbe;
+}
+.metric-bad {
+  color: #f63c6b;
+}
+.metric-warn {
+  color: #fbbf24;
+}
+
+/* ==========================
+   Market 상단 개인 ID 블럭 강조
+========================== */
+
+/* ID 라인 */
 .ticker-id {
-  font-size: 13px;
-  opacity: 0.8;
-  color: #a5b4fc;
-}
-
-.ticker-price-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.9;
+  color: #f2e6dd;
 }
 
 .ticker-price {
-  font-size: 40px;
-  font-weight: 600;
-  color: #c4b5fd; /* 보라톤 가격 */
+  font-size: 60px;
+  font-weight: 700;
+  color: #f9fafb;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 18px rgba(79, 70, 229, 0.55);
 }
 
 .ticker-delta {
-  font-size: 15px;
+  font-size: 22px; /* 15px → 20px */
+  font-weight: 600;
 }
 
-.ticker-delta.up {
-  color: #4ade80;
-}
-
-.ticker-delta.down {
-  color: #f97373;
-}
-
+/* 등락 퍼센트 */
 .ticker-rate {
-  font-size: 12px;
-  opacity: 0.85;
+  font-size: 18px;
+  font-weight: 600;
 }
 
+/* 등락 색 더 쨍하게 */
+.ticker-delta.up,
+.ticker-price.up,
+.ticker-rate.up {
+  color: #0fedbe;
+}
+
+.ticker-delta.down,
+.ticker-price.down,
+.ticker-rate.down {
+  color: #f63c6b;
+}
+
+/* 서브 텍스트/메타도 살짝 키우기 */
 .ticker-sub {
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 14px;
+  opacity: 0.8;
 }
 
 .ticker-meta {
-  font-size: 11px;
-  opacity: 0.95;
-  color: #e5e7ff;
+  font-size: 12px;
+  opacity: 0.9;
+  color: #f2e6dd;
 }
 
 .ticker-stats {

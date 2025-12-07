@@ -461,9 +461,20 @@ function renderTicker() {
   tickerDeltaEl.textContent = deltaStr;
   tickerRateEl.textContent = rateStr;
 
+  // 등락에 따라 up/down 클래스 적용 (가격/퍼센트까지 같이)
   tickerDeltaEl.classList.remove("up", "down");
-  if (delta > 0.05) tickerDeltaEl.classList.add("up");
-  else if (delta < -0.05) tickerDeltaEl.classList.add("down");
+  tickerPriceEl.classList.remove("up", "down");
+  tickerRateEl.classList.remove("up", "down");
+
+  if (delta > 0.05) {
+    tickerDeltaEl.classList.add("up");
+    tickerPriceEl.classList.add("up");
+    tickerRateEl.classList.add("up");
+  } else if (delta < -0.05) {
+    tickerDeltaEl.classList.add("down");
+    tickerPriceEl.classList.add("down");
+    tickerRateEl.classList.add("down");
+  }
 
   tickerSubEl.textContent = "장내 자산 실시간 상장 상태.";
 
@@ -510,6 +521,45 @@ function renderScanParams() {
   metricEfficiencyEl.textContent = m.efficiency;
   metricContributionEl.textContent = m.contribution;
   metricLevelEl.textContent = m.level;
+
+  // 색 초기화
+  [
+    metricPurityEl,
+    metricEfficiencyEl,
+    metricContributionEl,
+    metricLevelEl,
+  ].forEach((el) => {
+    el.classList.remove("metric-good", "metric-bad", "metric-warn");
+  });
+
+  // 정제율 기준 색
+  if (m.purity >= 70) metricPurityEl.classList.add("metric-good");
+  else if (m.purity < 40) metricPurityEl.classList.add("metric-bad");
+  else metricPurityEl.classList.add("metric-warn");
+
+  // 효율 (1.0 기준)
+  const effVal = parseFloat(m.efficiency);
+  if (effVal >= 1.1) metricEfficiencyEl.classList.add("metric-good");
+  else if (effVal <= 0.9) metricEfficiencyEl.classList.add("metric-bad");
+  else metricEfficiencyEl.classList.add("metric-warn");
+
+  // 기여도 등급 (A+ > A > B+ > B > C)
+  if (m.contribution === "A+" || m.contribution === "A") {
+    metricContributionEl.classList.add("metric-good");
+  } else if (m.contribution === "C") {
+    metricContributionEl.classList.add("metric-bad");
+  } else {
+    metricContributionEl.classList.add("metric-warn");
+  }
+
+  // 거래 등급 (Lv4 최고, Lv1 최저)
+  if (m.level === "Lv4" || m.level === "Lv3") {
+    metricLevelEl.classList.add("metric-good");
+  } else if (m.level === "Lv1") {
+    metricLevelEl.classList.add("metric-bad");
+  } else {
+    metricLevelEl.classList.add("metric-warn");
+  }
 
   if (tickerMetaEl) {
     tickerMetaEl.textContent =
