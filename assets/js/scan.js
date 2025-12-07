@@ -1060,56 +1060,76 @@ function onPressureChange(on) {
 // -----------------------------
 // 버튼/이벤트 바인딩
 // -----------------------------
-debugStartBtn.addEventListener("click", () => {
-  // 전체 리셋 후 대기
-  pirOn = false;
-  pressureOn = false;
-  scanTimer = 0;
-  purity = 0;
-  updateSensorStatus();
-  setPhase("A0-1");
-});
 
-btnPirOn.addEventListener("click", () => onPirChange(true));
-btnPirOff.addEventListener("click", () => onPirChange(false));
-btnSit.addEventListener("click", () => onPressureChange(true));
-btnStand.addEventListener("click", () => onPressureChange(false));
-btnReset.addEventListener("click", () => {
-  pirOn = false;
-  pressureOn = false;
-  scanTimer = 0;
-  purity = 0;
-  updateSensorStatus();
-  setPhase("A0-1");
-});
-
-btnYes.addEventListener("click", async () => {
-  setPhase("C3");
-  await listCardToSupabase(); // 여기서 실제 상장 (insert + listed=true)
-  // 약간의 연출 후 A0-1로 리셋
-  setTimeout(() => {
-    // 체험 리셋
+// 디버그 버튼
+if (debugStartBtn) {
+  debugStartBtn.addEventListener("click", () => {
+    // 전체 리셋 후 대기
     pirOn = false;
     pressureOn = false;
     scanTimer = 0;
     purity = 0;
     updateSensorStatus();
     setPhase("A0-1");
-  }, 3000);
-});
+  });
+}
 
-btnNo.addEventListener("click", () => {
-  setPhase("C4");
-  // 잠시 보여주고 초기화
-  setTimeout(() => {
+// 센서 시뮬레이터 버튼들 (없으면 그냥 무시)
+if (btnPirOn) {
+  btnPirOn.addEventListener("click", () => onPirChange(true));
+}
+if (btnPirOff) {
+  btnPirOff.addEventListener("click", () => onPirChange(false));
+}
+if (btnSit) {
+  btnSit.addEventListener("click", () => onPressureChange(true));
+}
+if (btnStand) {
+  btnStand.addEventListener("click", () => onPressureChange(false));
+}
+if (btnReset) {
+  btnReset.addEventListener("click", () => {
     pirOn = false;
     pressureOn = false;
     scanTimer = 0;
     purity = 0;
     updateSensorStatus();
     setPhase("A0-1");
-  }, 4000);
-});
+  });
+}
+
+// YES / NO 버튼 (이건 지금 HTML에 있으니까 그대로 써도 되는데, 통일해서 체크)
+if (btnYes) {
+  btnYes.addEventListener("click", async () => {
+    setPhase("C3");
+    await listCardToSupabase(); // 여기서 실제 상장 (insert + listed=true)
+    // 약간의 연출 후 A0-1로 리셋
+    setTimeout(() => {
+      // 체험 리셋
+      pirOn = false;
+      pressureOn = false;
+      scanTimer = 0;
+      purity = 0;
+      updateSensorStatus();
+      setPhase("A0-1");
+    }, 3000);
+  });
+}
+
+if (btnNo) {
+  btnNo.addEventListener("click", () => {
+    setPhase("C4");
+    // 잠시 보여주고 초기화
+    setTimeout(() => {
+      pirOn = false;
+      pressureOn = false;
+      scanTimer = 0;
+      purity = 0;
+      updateSensorStatus();
+      setPhase("A0-1");
+    }, 4000);
+  });
+}
 
 // -----------------------------
 // 초기화 & 루프 시작

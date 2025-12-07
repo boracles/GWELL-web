@@ -797,6 +797,14 @@ body {
   margin-bottom: 14px;
 }
 
+.market-top-left .mt-id {
+  font-size: 20px; /* ID 글자 키우기 (기존 20 근처) */
+  font-weight: 500;
+}
+.market-top-left .mt-price {
+  font-size: 60px; /* 가치 숫자 더 크게 (기존 60) */
+  font-weight: 700;
+}
 /* 왼쪽: 큰 숫자 + 설명 */
 .market-top-left {
   flex: 0 0 38%;
@@ -806,19 +814,18 @@ body {
 }
 
 .mt-id-line {
-  font-size: 12px;
-  opacity: 0.7;
-  letter-spacing: 0.08em;
+  display: flex; /* 라벨 + 값 가로 배치 */
+  align-items: baseline;
+  gap: 1px; /* 🔹 여기 숫자로 간격 조절 (3~6px 사이 추천) */
+  font-size: 18px;
+  opacity: 0.9;
+  letter-spacing: 0; /* 🔹 전체 자간은 없애서 쓸데없이 벌어지지 않게 */
   text-transform: uppercase;
 }
 
 .mt-id-label {
   opacity: 0.7;
-  margin-right: 4px;
-}
-
-.mt-id {
-  font-weight: 600;
+  margin-right: 5px;
 }
 
 .mt-price-main {
@@ -829,7 +836,7 @@ body {
 }
 
 .mt-price {
-  font-size: 40px;
+  font-size: 32px;
   font-weight: 700;
   color: #431e75;
 }
@@ -846,10 +853,7 @@ body {
 }
 
 .mt-rate-line {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 12px;
+  display: none;
 }
 
 .mt-rate {

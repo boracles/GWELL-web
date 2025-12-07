@@ -450,7 +450,7 @@ function renderTicker() {
   const asset = getMainAsset();
   if (!asset || !tickerIdEl) return;
 
-  tickerIdEl.textContent = `ID ${asset.id}`;
+  tickerIdEl.textContent = asset.id;
   if (stripIdEl) stripIdEl.textContent = `ID ${asset.id}`;
 
   tickerPriceEl.textContent = formatNumber(asset.value);
