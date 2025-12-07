@@ -2,6 +2,17 @@
    기본 style.css
 ========================== */
 
+/* ---------------------------
+   Safe Padding for Kiosk Monitor
+   --------------------------- */
+.market-safe {
+  padding: 40px 40px 32px 40px;
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
 *,
 *::before,
 *::after {
@@ -526,14 +537,13 @@ body {
 
 .issue-bar {
   padding: 8px 20px;
-  background: transparent;   /* 마켓에서는 .issue-bar--market이 덮어씀 */
-  border-bottom: none;       /* 🔹 기본 라인 제거 */
+  background: transparent; /* 마켓에서는 .issue-bar--market이 덮어씀 */
+  border-bottom: none; /* 🔹 기본 라인 제거 */
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 
 .issue-tag {
   display: inline-block;
@@ -974,8 +984,8 @@ body {
 }
 
 .market-shell {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: #000000;
@@ -983,16 +993,15 @@ body {
 
 /* 상단 로고 바 */
 .market-header {
-  height: 96px;           /* 로고 64px 기준 */
+  height: 96px; /* 로고 64px 기준 */
   padding: 0 18px;
   display: flex;
   align-items: center;
   justify-content: center; /* 로고 가운데 정렬 */
-  background: #000000;     /* 🔹 여기! 검정으로 */
+  background: #000000; /* 🔹 여기! 검정으로 */
   border-bottom: none;
-  position: relative;      /* 시계 absolute 배치용 */
+  position: relative; /* 시계 absolute 배치용 */
 }
-
 
 .market-logo {
   display: flex;
@@ -1007,14 +1016,13 @@ body {
 }
 
 .market-header-right {
-  position: absolute;         /* 🔹 헤더 안에서 절대 배치 */
-  right: 24px;                /* 오른쪽 여백 */
-  top: 0%;                   /* 세로 가운데 정렬 */
+  position: absolute; /* 🔹 헤더 안에서 절대 배치 */
+  right: 24px; /* 오른쪽 여백 */
+  top: 0%; /* 세로 가운데 정렬 */
   transform: translateY(-50%);
   font-size: 11px;
   opacity: 0.7;
 }
-
 
 /* 얇은 정보 스트립 */
 .market-strip {
@@ -1052,7 +1060,6 @@ body {
 /* 이슈/뉴스 바 – 크게 */
 .issue-bar--market {
   padding: 12px 24px; /* 🔹 약간 여유 있게 */
-  background: #202021
   border-bottom: none; /* 🔹 아래 라인 제거 */
   display: flex;
   gap: 10px;
