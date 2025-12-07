@@ -6,8 +6,9 @@ const standbyScreenEl = document.getElementById("standbyScreen");
 const scanHeaderEl = document.getElementById("scanHeader");
 const scanRootEl = document.getElementById("scanRoot");
 
+// 🔹 이걸로 교체해
 const standbyCanvas = document.getElementById("standbyParticles");
-const standbyCtx = standbyCanvas.getContext("2d");
+const standbyCtx = standbyCanvas ? standbyCanvas.getContext("2d") : null;
 
 const postureEl = document.getElementById("scanPosture");
 const scanTopRowEl = document.getElementById("scanTopRow");

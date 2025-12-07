@@ -1059,12 +1059,13 @@ body {
 
 /* 이슈/뉴스 바 – 크게 */
 .issue-bar--market {
-  padding: 12px 24px; /* 🔹 약간 여유 있게 */
-  border-bottom: none; /* 🔹 아래 라인 제거 */
+  padding: 16px 24px; /* 🔹 약간 여유 있게 */
+  background: #19151c; /* 🔹 뉴스 바 배경색 */
+  border-bottom: none;
   display: flex;
   gap: 10px;
   align-items: center;
-  font-size: 14px;
+  font-size: 16px;
   margin-bottom: 4px;
 }
 
