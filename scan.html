@@ -271,7 +271,14 @@
 
           <div class="scan-content">
             <div class="scan-posture" id="scanPosture" style="display: none">
-              <!-- 인포그래픽 -->
+              <!-- 제목 + 고정 안내 문구 (인포그래픽 위) -->
+              <div class="posture-message">올바른 자세로 앉아 주세요.</div>
+
+              <div class="posture-sub posture-sub-soft" id="postureLine4">
+                잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.
+              </div>
+
+              <!-- 인포그래픽 (조금 더 아래로) -->
               <div class="posture-graphic">
                 <img
                   src="assets/img/Sit.svg"
@@ -281,8 +288,7 @@
                 />
               </div>
 
-              <div class="posture-message">올바른 자세로 앉아 주세요.</div>
-
+              <!-- 단계 안내 문장 (순차적으로 한 줄씩) -->
               <div class="posture-sub posture-line" id="postureLine1">
                 등을 곧게 펴세요.
               </div>
@@ -295,11 +301,28 @@
                 몸을 흔들지 말고 호흡을 고르게 유지하세요.
               </div>
 
-              <div
-                class="posture-sub posture-sub-soft posture-line"
-                id="postureLine4"
-              >
-                잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.
+              <!-- 🔹 3단계 프로그레스 + 체크 -->
+              <div class="posture-stepper">
+                <div class="posture-progress-bar">
+                  <div
+                    class="posture-progress-bar-inner"
+                    id="postureProgressInner"
+                  ></div>
+                </div>
+                <div class="posture-stepper-dots">
+                  <div class="posture-step" data-step="1">
+                    <span class="posture-step-dot"></span>
+                    <span class="posture-step-check">✔</span>
+                  </div>
+                  <div class="posture-step" data-step="2">
+                    <span class="posture-step-dot"></span>
+                    <span class="posture-step-check">✔</span>
+                  </div>
+                  <div class="posture-step" data-step="3">
+                    <span class="posture-step-dot"></span>
+                    <span class="posture-step-check">✔</span>
+                  </div>
+                </div>
               </div>
             </div>
 

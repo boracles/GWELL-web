@@ -20,6 +20,10 @@ const sensorSimEl = document.getElementById("sensorSim");
 const postureLine1El = document.getElementById("postureLine1");
 const postureLine2El = document.getElementById("postureLine2");
 const postureLine3El = document.getElementById("postureLine3");
+const postureLine4El = document.getElementById("postureLine4");
+
+const postureProgressInner = document.getElementById("postureProgressInner");
+const postureStepEls = document.querySelectorAll(".posture-step");
 
 // -----------------------------
 // 상태 및 타이머 관리
@@ -297,10 +301,11 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.5;
       break;
 
-    case "POSTURE": // 착석 안내 화면
+    case "POSTURE":
       statusSystemEl.textContent = "";
 
-      // 시스템 UI 숨기기
+      // 상단 바, 기본 UI 숨기기
+      if (scanHeaderEl) scanHeaderEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "none";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
       if (scanBottomEl) scanBottomEl.style.display = "none";
@@ -308,36 +313,76 @@ function setPhase(phase) {
       warningMessageEl.style.display = "none";
       resultListEl.style.display = "none";
 
-      // 인포그래픽 블럭 보이기
+      // posture 화면만 보이게
       if (postureEl) postureEl.style.display = "flex";
 
-      // 배경
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.6;
 
-      // 이전 타이머 모두 제거
+      // 고정 문구(제목 + 아래 한 줄)는 항상 표시
+      if (postureLine4El) postureLine4El.style.opacity = 1;
+
+      // 🔹 순차 문장 + 프로그레스 초기화
+      const seqMessages = [postureLine1El, postureLine2El, postureLine3El];
+
       postureTimers.forEach(clearTimeout);
       postureTimers = [];
 
-      // 3줄 문구를 순차적으로 표시
-      const lines = [postureLine1El, postureLine2El, postureLine3El];
-      const delays = [0, 1500, 3000]; // ms
-
-      // 처음엔 모두 숨김
-      lines.forEach((el) => {
+      // 문장 숨기기
+      seqMessages.forEach((el) => {
         if (el) el.style.opacity = 0;
       });
 
-      // 순차적으로 한 줄씩 나타나게
-      delays.forEach((delay, index) => {
-        const timerId = setTimeout(() => {
-          if (currentPhase !== "POSTURE") return;
-          const el = lines[index];
-          if (el) el.style.opacity = 1;
-        }, delay);
-        postureTimers.push(timerId);
-      });
+      // 프로그레스바, 체크 초기화
+      if (postureProgressInner) postureProgressInner.style.width = "0%";
+      if (postureStepEls) {
+        postureStepEls.forEach((el) => el.classList.remove("completed"));
+      }
 
+      let idx = 0;
+
+      function goToScanPhase() {
+        // 3단계 모두 끝나면 자동으로 스캔 캘리브레이션으로 전환
+        setPhase("A1-2");
+        scanTimer = 0;
+        purity = 0;
+        updateProgress();
+      }
+
+      function showNext() {
+        if (idx >= seqMessages.length) {
+          // 마지막까지 완료된 뒤 살짝 텀 주고 스캔으로
+          setTimeout(goToScanPhase, 700);
+          return;
+        }
+
+        const el = seqMessages[idx];
+        if (!el) return;
+
+        el.style.transition = "opacity 0.5s ease";
+        el.style.opacity = 1;
+
+        // 프로그레스 채우기 + 해당 스텝 체크
+        const progressRatio = ((idx + 1) / seqMessages.length) * 100;
+        if (postureProgressInner) {
+          postureProgressInner.style.width = progressRatio + "%";
+        }
+        if (postureStepEls && postureStepEls[idx]) {
+          postureStepEls[idx].classList.add("completed");
+        }
+
+        // 2초 유지 후 사라지고, 다음 문장
+        const stayTimer = setTimeout(() => {
+          el.style.opacity = 0;
+          idx++;
+          const nextTimer = setTimeout(showNext, 500);
+          postureTimers.push(nextTimer);
+        }, 2000);
+
+        postureTimers.push(stayTimer);
+      }
+
+      showNext();
       break;
 
     case "A1-2":
