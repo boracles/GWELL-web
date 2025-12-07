@@ -23,7 +23,9 @@ const postureLine3El = document.getElementById("postureLine3");
 const postureLine4El = document.getElementById("postureLine4");
 
 const postureProgressInner = document.getElementById("postureProgressInner");
-const postureStepEls = document.querySelectorAll(".posture-step");
+// start 점은 빼고, data-step 있는 1·2·3만 대상으로
+// 🔹 시작점 없이, 실제 단계(1~4)만 선택
+const postureStepEls = document.querySelectorAll(".posture-step[data-step]");
 
 // -----------------------------
 // 상태 및 타이머 관리
@@ -301,10 +303,10 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.5;
       break;
 
-    case "POSTURE":
+    case "POSTURE": {
       statusSystemEl.textContent = "";
 
-      // 상단 바, 기본 UI 숨기기
+      // 상단/UI 숨기기
       if (scanHeaderEl) scanHeaderEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "none";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
@@ -319,71 +321,142 @@ function setPhase(phase) {
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.6;
 
-      // 고정 문구(제목 + 아래 한 줄)는 항상 표시
-      if (postureLine4El) postureLine4El.style.opacity = 1;
+      const seqText = document.getElementById("postureSequenceText");
 
-      // 🔹 순차 문장 + 프로그레스 초기화
-      const seqMessages = [postureLine1El, postureLine2El, postureLine3El];
-
-      postureTimers.forEach(clearTimeout);
-      postureTimers = [];
-
-      // 문장 숨기기
-      seqMessages.forEach((el) => {
-        if (el) el.style.opacity = 0;
-      });
-
-      // 프로그레스바, 체크 초기화
-      if (postureProgressInner) postureProgressInner.style.width = "0%";
-      if (postureStepEls) {
-        postureStepEls.forEach((el) => el.classList.remove("completed"));
-      }
+      // 🔹 4단계 문장
+      const seq = [
+        "등을 곧게 세우고 상체를 안정시켜 주세요.",
+        "배에 힘을 주어 장 쪽으로 압력을 모아 주세요.",
+        "조금만 더 힘을 유지해 주세요. 장 안에서 내용물이 이동하고 있습니다.",
+        "이제 아래로 부드럽게 밀어내며 배출을 시작해 주세요.",
+      ];
 
       let idx = 0;
+      let currentProgress = 0;
 
-      function goToScanPhase() {
-        // 3단계 모두 끝나면 자동으로 스캔 캘리브레이션으로 전환
-        setPhase("A1-2");
-        scanTimer = 0;
-        purity = 0;
-        updateProgress();
+      // 🔥 여기서 완전 리셋 (체크/프로그레스/문장 모두)
+      if (seqText) {
+        seqText.style.opacity = 0;
+        seqText.innerText = "";
+      }
+      if (postureProgressInner) {
+        postureProgressInner.style.width = "0%";
+      }
+      postureStepEls.forEach((el) => {
+        el.classList.remove("completed");
+        const check = el.querySelector(".posture-step-check");
+        if (check) {
+          check.style.opacity = "0"; // 혹시 남아 있는 스타일 강제 OFF
+        }
+      });
+
+      // SVG 강조 애니메이션
+      function pumpSVG() {
+        const img = document.getElementById("postureImg");
+        if (!img) return;
+        img.style.transition = "transform 0.35s ease";
+        img.style.transform = "scale(1.08)";
+        setTimeout(() => (img.style.transform = "scale(1.0)"), 350);
       }
 
-      function showNext() {
-        if (idx >= seqMessages.length) {
-          // 마지막까지 완료된 뒤 살짝 텀 주고 스캔으로
-          setTimeout(goToScanPhase, 700);
+      // 부드러운 로딩바 애니메이션
+      function animateProgressTo(targetPercent, onDone) {
+        const duration = 900;
+        const interval = 40;
+        const steps = Math.floor(duration / interval);
+        const start = currentProgress;
+        const delta = (targetPercent - start) / steps;
+
+        let count = 0;
+        const id = setInterval(() => {
+          count++;
+          currentProgress = start + delta * count;
+
+          if (postureProgressInner) {
+            postureProgressInner.style.width = currentProgress + "%";
+          }
+
+          if (count >= steps) {
+            clearInterval(id);
+            currentProgress = targetPercent;
+            if (postureProgressInner) {
+              postureProgressInner.style.width = targetPercent + "%";
+            }
+            if (typeof onDone === "function") onDone();
+          }
+        }, interval);
+
+        postureTimers.push(id);
+      }
+
+      function goToScanPhase() {
+        // 마지막 단계 끝 → 장내 데이터 감지 문구 한 번 보여주고 스캔 단계로
+        if (postureLine4El) {
+          postureLine4El.textContent =
+            "장내 배출 신호를 감지했습니다. 장내 데이터 정렬을 시작합니다.";
+        }
+        setTimeout(() => {
+          setPhase("A1-2");
+          scanTimer = 0;
+          purity = 0;
+          updateProgress();
+        }, 1000);
+      }
+
+      function nextSentence() {
+        if (!seqText) return;
+
+        if (idx >= seq.length) {
+          // 네 번째 문장까지 끝나면 스캔으로 넘어갈 준비
+          goToScanPhase();
           return;
         }
 
-        const el = seqMessages[idx];
-        if (!el) return;
+        // 1) 같은 자리에서 문장 교체
+        seqText.innerText = seq[idx];
+        seqText.style.opacity = 1;
 
-        el.style.transition = "opacity 0.5s ease";
-        el.style.opacity = 1;
+        // 2) 문장만 먼저 잠깐 보이기
+        const t1 = setTimeout(() => {
+          // 3) SVG 강하게 한 번 펌핑
+          pumpSVG();
 
-        // 프로그레스 채우기 + 해당 스텝 체크
-        const progressRatio = ((idx + 1) / seqMessages.length) * 100;
-        if (postureProgressInner) {
-          postureProgressInner.style.width = progressRatio + "%";
-        }
-        if (postureStepEls && postureStepEls[idx]) {
-          postureStepEls[idx].classList.add("completed");
-        }
+          // 4) 펌핑 끝난 뒤 로딩바 부드럽게 채우기
+          const t2 = setTimeout(() => {
+            const target = ((idx + 1) / seq.length) * 100;
 
-        // 2초 유지 후 사라지고, 다음 문장
-        const stayTimer = setTimeout(() => {
-          el.style.opacity = 0;
-          idx++;
-          const nextTimer = setTimeout(showNext, 500);
-          postureTimers.push(nextTimer);
-        }, 2000);
+            animateProgressTo(target, () => {
+              // 5) 로딩바가 해당 지점까지 다 채워진 뒤 → 그 지점에 체크
+              if (postureStepEls && postureStepEls[idx]) {
+                postureStepEls[idx].classList.add("completed");
+              }
 
-        postureTimers.push(stayTimer);
+              // 6) 문장 페이드아웃
+              setTimeout(() => {
+                seqText.style.opacity = 0;
+
+                // 7) 다음 문장으로
+                setTimeout(() => {
+                  idx++;
+                  nextSentence();
+                }, 400);
+              }, 700);
+            });
+          }, 400);
+
+          postureTimers.push(t2);
+        }, 900);
+
+        postureTimers.push(t1);
       }
 
-      showNext();
+      // 기존 타이머 정리 후 시작
+      postureTimers.forEach(clearTimeout);
+      postureTimers = [];
+      nextSentence();
+
       break;
+    }
 
     case "A1-2":
       // 자세 안내 숨기기

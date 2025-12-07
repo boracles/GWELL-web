@@ -278,7 +278,7 @@
                 잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.
               </div>
 
-              <!-- 인포그래픽 (조금 더 아래로) -->
+              <!-- 인포그래픽 -->
               <div class="posture-graphic">
                 <img
                   src="assets/img/Sit.svg"
@@ -288,20 +288,12 @@
                 />
               </div>
 
-              <!-- 단계 안내 문장 (순차적으로 한 줄씩) -->
-              <div class="posture-sub posture-line" id="postureLine1">
-                등을 곧게 펴세요.
+              <!-- 🔹 여기가 “한 줄씩 바뀌어 나오는” 자리 (하나만) -->
+              <div class="posture-sub posture-line" id="postureSequenceText">
+                <!-- JS에서 문장 교체함 -->
               </div>
 
-              <div class="posture-sub posture-line" id="postureLine2">
-                발을 바닥에 붙이고 엉덩이에 힘을 주세요.
-              </div>
-
-              <div class="posture-sub posture-line" id="postureLine3">
-                몸을 흔들지 말고 호흡을 고르게 유지하세요.
-              </div>
-
-              <!-- 🔹 3단계 프로그레스 + 체크 -->
+              <!-- 🔹 4단계 프로그레스 + 체크 (시작에는 체크 없음) -->
               <div class="posture-stepper">
                 <div class="posture-progress-bar">
                   <div
@@ -319,6 +311,10 @@
                     <span class="posture-step-check">✔</span>
                   </div>
                   <div class="posture-step" data-step="3">
+                    <span class="posture-step-dot"></span>
+                    <span class="posture-step-check">✔</span>
+                  </div>
+                  <div class="posture-step" data-step="4">
                     <span class="posture-step-dot"></span>
                     <span class="posture-step-check">✔</span>
                   </div>

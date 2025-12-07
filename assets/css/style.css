@@ -539,6 +539,135 @@ body {
   margin-top: 14px;
 }
 
+/* 메인 레이아웃을 주식 대시보드 느낌으로 */
+.app-main-layout--market {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr;
+  gap: 18px;
+  padding: 0 20px 20px;
+}
+
+/* 메인 차트 영역 */
+.primary-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 오른쪽 패널 */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 개인 ID 요약 카드 */
+.asset-summary-card {
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.asset-summary-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.asset-id {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.asset-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.asset-price {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.asset-delta {
+  font-size: 14px;
+}
+
+.asset-delta.up {
+  color: var(--green);
+}
+
+.asset-delta.down {
+  color: var(--red);
+}
+
+.asset-meta {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.asset-summary-right {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  font-size: 11px;
+}
+
+.asset-metric .label {
+  display: block;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.asset-metric .value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 차트 영역 */
+.chart-wrapper {
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  padding: 10px 8px 12px;
+  height: 320px;
+}
+
+.chart-wrapper canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 오른쪽 리스트/가중치 박스 */
+.market-panel-small {
+  background: var(--bg-panel);
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  padding: 10px 12px 12px;
+}
+
+/* 반응형 */
+@media (max-width: 900px) {
+  .app-main-layout--market {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .asset-summary-right {
+    width: 100%;
+  }
+}
+
 .market-panel {
   flex: 1.6;
 }
@@ -735,6 +864,218 @@ body {
 
 .posture-step.completed .posture-step-check {
   opacity: 1;
+}
+
+.posture-step.start .posture-step-check {
+  display: none !important;
+}
+
+#postureSequenceText {
+  font-size: 22px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  min-height: 28px; /* 높이 확보 → 문장 바뀌어도 layout 안밀림 */
+}
+
+/* ==========================
+   Market 페이지 — 트레이딩 화면 스타일
+========================== */
+
+.market-body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, "Noto Sans KR",
+    sans-serif;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+.market-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #020617;
+}
+
+/* 상단 로고 바 */
+.market-header {
+  height: 44px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #020617;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.market-logo {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+}
+
+.market-logo-sub {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-left: 8px;
+}
+
+.market-header-right {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* 얇은 정보 스트립 */
+.market-strip {
+  height: 26px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #050816;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.strip-item {
+  white-space: nowrap;
+}
+
+.strip-center {
+  text-align: center;
+  flex: 1;
+}
+
+.strip-right {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.strip-dot {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* 이슈 바 — 기존 issue-bar 클래스를 약간만 재사용 */
+.issue-bar--market {
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+/* 메인 영역 */
+.market-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px 16px;
+  gap: 8px;
+}
+
+/* 티커 요약 */
+.ticker-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.ticker-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ticker-id {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.ticker-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ticker-price {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.ticker-delta {
+  font-size: 14px;
+}
+
+.ticker-delta.up {
+  color: #4ade80;
+}
+
+.ticker-delta.down {
+  color: #f97373;
+}
+
+.ticker-rate {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.ticker-sub {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.ticker-right {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 14px;
+  font-size: 11px;
+}
+
+.ticker-stat .label {
+  display: block;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.ticker-stat .value {
+  font-size: 12px;
+}
+
+/* 차트 패널 */
+.chart-panel {
+  flex: 1;
+  background: #020617;
+  border-radius: 0 0 12px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 8px 8px 10px;
+  margin-top: 4px;
+}
+
+.chart-panel canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 하단 문구 */
+.market-footer {
+  margin-top: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+  text-align: center;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 4px;
+}
+
+/* 반응형 */
+@media (max-width: 900px) {
+  .ticker-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ticker-right {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
