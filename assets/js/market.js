@@ -26,6 +26,7 @@ let candleData = [];
 const MAX_CANDLES = 120;
 
 let lineData = [];
+let volumeData = [];
 
 let indicatorChart;
 let indicatorData = [];
@@ -694,22 +695,10 @@ function initPriceChart() {
   globalHigh = v;
   globalLow = v;
 
-  // 🔹 첫 번째 캔들 + 첫 번째 라인 포인트
-  candleData = [
-    {
-      x: tick,
-      o: v,
-      h: v,
-      l: v,
-      c: v,
-    },
-  ];
-  lineData = [
-    {
-      x: tick,
-      y: v, // 종가 라인
-    },
-  ];
+  // x를 0부터 시작하는 인덱스로 사용
+  candleData = [{ x: 0, o: v, h: v, l: v, c: v }];
+  lineData = [{ x: 0, y: v }];
+  volumeData = [{ x: 0, y: Math.abs(v - asset.prevValue || 1) }];
 
   const ctx = canvas.getContext("2d");
 
@@ -727,39 +716,59 @@ function initPriceChart() {
             unchanged: "#e5e7eb",
           },
           borderColor: "#e5e7eb",
+          yAxisID: "yPrice",
         },
         {
-          type: "line", // 🔹 위에 그려질 라인
+          // 종가 라인
+          type: "line",
           label: "Close",
           data: lineData,
-          borderColor: "#facc15", // 노란 라인 (원하면 바꿔도 됨)
-          borderWidth: 1.5,
+          borderColor: "#facc15",
+          borderWidth: 2,
           pointRadius: 0,
-          tension: 0, // 0 = 직선, 0.3 정도 주면 살짝 곡선
+          tension: 0.35, // 🔹 더 부드럽게
+          yAxisID: "yPrice",
+        },
+        {
+          // 거래량 막대
+          type: "bar",
+          label: "Volume",
+          data: volumeData,
+          yAxisID: "yVolume",
+          backgroundColor: "rgba(148, 163, 184, 0.45)",
+          borderWidth: 0,
+          barPercentage: 1.0,
+          categoryPercentage: 1.0,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: {
+        padding: 0,
+      },
       plugins: {
-        legend: {
-          display: false,
-        },
+        legend: { display: false },
       },
       scales: {
         x: {
           type: "linear",
           ticks: { display: false },
           grid: { display: false },
+          offset: false,
+          min: 0,
+          max: 0,
         },
-        y: {
-          ticks: {
-            color: "#e5e7eb",
-          },
-          grid: {
-            color: "rgba(148,163,184,0.3)",
-          },
+        yPrice: {
+          position: "right",
+          ticks: { color: "#e5e7eb" },
+          grid: { color: "rgba(148,163,184,0.3)" },
+        },
+        yVolume: {
+          position: "right",
+          display: false, // 눈금 감추고
+          grid: { display: false },
         },
       },
     },
@@ -780,32 +789,40 @@ function appendCandle() {
   globalHigh = globalHigh === null ? high : Math.max(globalHigh, high);
   globalLow = globalLow === null ? low : Math.min(globalLow, low);
 
-  // 캔들 데이터
-  candleData.push({
-    x: tick,
-    o: open,
-    h: high,
-    l: low,
-    c: close,
-  });
-  if (candleData.length > MAX_CANDLES) {
-    candleData.shift();
-  }
+  // 새 데이터 push
+  candleData.push({ x: 0, o: open, h: high, l: low, c: close });
+  lineData.push({ x: 0, y: close });
 
-  // 🔹 라인 데이터 (close 기준)
-  lineData.push({
-    x: tick,
-    y: close,
-  });
-  if (lineData.length > MAX_CANDLES) {
-    lineData.shift();
+  const vol = Math.abs(close - open) + 1; // 🔹 간단한 의사 거래량
+  volumeData.push({ x: 0, y: vol });
+
+  // 최대 개수 넘으면 왼쪽부터 제거
+  if (candleData.length > MAX_CANDLES) candleData.shift();
+  if (lineData.length > MAX_CANDLES) lineData.shift();
+  if (volumeData.length > MAX_CANDLES) volumeData.shift();
+
+  // 🔹 x 값을 0..n-1로 재인덱싱 → 스케일 변형 없이 안에서만 업데이트
+  for (let i = 0; i < candleData.length; i++) {
+    candleData[i].x = i;
+    lineData[i].x = i;
+    volumeData[i].x = i;
   }
 }
 
 function updatePriceChart() {
   if (!priceChart) return;
+
   priceChart.data.datasets[0].data = candleData; // 캔들
-  priceChart.data.datasets[1].data = lineData; // 🔹 라인
+  priceChart.data.datasets[1].data = lineData; // 라인
+  priceChart.data.datasets[2].data = volumeData; // 볼륨
+
+  if (candleData.length > 0) {
+    const n = candleData.length;
+    const xScale = priceChart.options.scales.x;
+    xScale.min = 0;
+    xScale.max = n - 1; // 항상 0~n-1 고정 → 전체 프레임이 안 출렁거림
+  }
+
   priceChart.update("none");
 }
 

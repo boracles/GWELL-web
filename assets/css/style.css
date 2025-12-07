@@ -1612,6 +1612,7 @@ body {
 .chart-main canvas {
   width: 100% !important;
   height: 100% !important;
+  display: block;
 }
 
 /* 아래 인디케이터 */

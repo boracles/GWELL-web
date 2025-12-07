@@ -51,6 +51,9 @@ let scanTotal = 30; // B 전체 길이 (대략)
 let purity = 0; // 정제율 %
 let loopInterval = null;
 
+let scanOverallTimer = 0;
+const SCAN_OVERALL_TOTAL = 40; // 전체 스캔 길이(초) – 적당히 잡아둔 값
+
 let lastSitTime = null;
 let lastPressureChangeTime = null;
 
@@ -255,48 +258,118 @@ const scanStepTexts = [
 
 let currentScanStep = -1;
 
-function updateScanSequence(ratio) {
+let scanCurrentRatio = 0; // 0~1 (로딩바 전체 비율)
+let scanStepIndex = -1; // 현재 단계 index
+let scanProgressInterval = null; // setInterval 핸들
+
+function clearScanProgressInterval() {
+  if (scanProgressInterval) {
+    clearInterval(scanProgressInterval);
+    scanProgressInterval = null;
+  }
+}
+
+// 스캔 단계 UI 전체 리셋
+function resetScanProgressUI() {
+  clearScanProgressInterval();
+  scanCurrentRatio = 0;
+  scanStepIndex = -1;
+
+  if (progressBarInnerEl) {
+    progressBarInnerEl.style.width = "0%";
+  }
+  if (progressTimeEl) {
+    progressTimeEl.textContent = "";
+  }
+  if (remainingTimeEl) {
+    remainingTimeEl.textContent = "";
+  }
+  if (statusTimerEl) {
+    statusTimerEl.textContent = "";
+  }
+  if (scanSequenceTextEl) {
+    scanSequenceTextEl.textContent = "";
+  }
+
+  scanStepEls.forEach((el) => {
+    el.classList.remove("completed");
+    const check = el.querySelector(".scan-step-check");
+    if (check) check.style.opacity = "0";
+  });
+}
+
+// 👉 좌석 안내 progress처럼, 특정 단계까지 "한 번" 채우는 함수
+function goToScanStep(stepIndex) {
   if (!scanSequenceEl || !scanStepEls.length) return;
 
-  const isScanPhase =
-    currentPhase === "A1-2" ||
-    currentPhase === "B1" ||
-    currentPhase === "B2" ||
-    currentPhase === "B3" ||
-    currentPhase === "C1";
-
-  if (!isScanPhase) {
-    scanSequenceEl.style.display = "none";
-    currentScanStep = -1;
-    scanStepEls.forEach((el) => {
-      const check = el.querySelector(".scan-step-check");
-      el.classList.remove("completed");
-      if (check) check.style.opacity = "0";
-    });
-    if (scanSequenceTextEl) scanSequenceTextEl.textContent = "";
-    return;
-  }
-
+  // 하단 단계 UI 보이기
   scanSequenceEl.style.display = "block";
 
-  const stepCount = scanStepTexts.length;
-  let stepIndex = Math.floor(ratio * stepCount);
-  if (stepIndex < 0) stepIndex = 0;
-  if (stepIndex >= stepCount) stepIndex = stepCount - 1;
-
-  // 문장 업데이트 (한 번에 하나)
-  if (scanSequenceTextEl && stepIndex !== currentScanStep) {
+  // 현재 단계 문장
+  if (scanSequenceTextEl) {
     scanSequenceTextEl.textContent = scanStepTexts[stepIndex];
   }
-  currentScanStep = stepIndex;
 
-  // 체크 표시: 현재 스텝까지 채우기
-  scanStepEls.forEach((el, idx) => {
-    const check = el.querySelector(".scan-step-check");
-    const active = idx <= stepIndex;
-    el.classList.toggle("completed", active);
-    if (check) check.style.opacity = active ? "1" : "0";
-  });
+  clearScanProgressInterval();
+
+  const stepCount = scanStepTexts.length;
+  const targetRatio = (stepIndex + 1) / stepCount; // 0.25, 0.5, 0.75, 1.0
+
+  const duration = 1100; // 좌석 안내랑 맞춘 1.1초
+  const interval = 50;
+  const steps = Math.floor(duration / interval);
+  const start = scanCurrentRatio;
+  const delta = (targetRatio - start) / steps;
+
+  let count = 0;
+  scanProgressInterval = setInterval(() => {
+    count++;
+    scanCurrentRatio = start + delta * count;
+    if (scanCurrentRatio < 0) scanCurrentRatio = 0;
+    if (scanCurrentRatio > 1) scanCurrentRatio = 1;
+
+    // 🔹 로딩바 채우기
+    const width = scanCurrentRatio * 100;
+    if (progressBarInnerEl) {
+      progressBarInnerEl.style.width = `${width}%`;
+    }
+
+    // 🔹 시간/남은 시간은 대략 비율 기준으로 계산
+    const elapsed = Math.round(scanCurrentRatio * SCAN_OVERALL_TOTAL);
+    const total = SCAN_OVERALL_TOTAL;
+    if (progressTimeEl) {
+      progressTimeEl.textContent = `${formatTime(elapsed)} / ${formatTime(
+        total
+      )}`;
+    }
+    if (remainingTimeEl) {
+      const remaining = Math.max(0, total - elapsed);
+      remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
+    }
+    if (statusTimerEl) {
+      statusTimerEl.textContent = formatTime(elapsed);
+    }
+
+    // 애니메이션 끝
+    if (count >= steps) {
+      clearScanProgressInterval();
+      scanProgressInterval = null;
+
+      // 🔹 이 단계까지 완료 → 체크 업데이트
+      scanStepEls.forEach((el, idx) => {
+        const check = el.querySelector(".scan-step-check");
+        const completed = idx <= stepIndex; // 이 index까지 ✔
+        el.classList.toggle("completed", completed);
+        if (check) check.style.opacity = completed ? "1" : "0";
+      });
+
+      scanStepIndex = stepIndex;
+    }
+  }, interval);
+}
+
+function updateScanSequence(ratio) {
+  // 더 이상 사용 안 함 (로딩바/체크는 goToScanStep에서 처리)
 }
 
 // -----------------------------
@@ -310,6 +383,21 @@ function setPhase(phase) {
   if (decisionButtonsEl) decisionButtonsEl.style.display = "none";
 
   const isStandby = phase === "A0-1" || phase === "A0-2";
+
+  // ✅ 결과 페이지(C2 이후)에서 하단 로딩바/단계 UI 숨기기
+  const isScanProgressPhase =
+    phase === "A1-2" ||
+    phase === "B1" ||
+    phase === "B2" ||
+    phase === "B3" ||
+    phase === "C1";
+
+  if (scanBottomEl) {
+    scanBottomEl.style.display = isScanProgressPhase ? "flex" : "none";
+  }
+  if (scanSequenceEl) {
+    scanSequenceEl.style.display = isScanProgressPhase ? "block" : "none";
+  }
 
   if (isStandby) {
     if (standbyScreenEl) standbyScreenEl.style.display = "block";
@@ -345,6 +433,7 @@ function setPhase(phase) {
       purity = 0;
       updateProgress();
       showMicrobes(false);
+      resetScanProgressUI();
       break;
 
     case "A0-2":
@@ -553,7 +642,6 @@ function setPhase(phase) {
       if (postureEl) postureEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "flex";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "block";
-      if (scanBottomEl) scanBottomEl.style.display = "flex";
       if (sensorSimEl) sensorSimEl.style.display = "flex";
 
       mainMessageEl.textContent = "초기 상태를 측정하고 있습니다.";
@@ -562,14 +650,15 @@ function setPhase(phase) {
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.7;
 
+      scanOverallTimer = 0;
       scanTimer = 0;
       scanTotal = 30;
       purity = 0;
-      updateProgress(); // ratio=0 → 첫 문장 + 첫 체크
+      updateProgress();
 
       microProgress = 0.25;
       showMicrobes(true);
-
+      goToScanStep(0);
       break;
 
     case "B1":
@@ -580,6 +669,8 @@ function setPhase(phase) {
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.6;
       showMicrobes(true);
+
+      goToScanStep(1);
       break;
 
     case "B2":
@@ -590,6 +681,8 @@ function setPhase(phase) {
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.65;
       showMicrobes(true);
+
+      goToScanStep(2);
       break;
 
     case "B3":
@@ -600,6 +693,8 @@ function setPhase(phase) {
       scanBgEl.className = "scan-bg noise";
       scanBgEl.style.opacity = 0.6;
       showMicrobes(true);
+
+      goToScanStep(3);
       break;
 
     case "C1":
@@ -682,30 +777,7 @@ function updateSensorStatus() {
 // 진행바 업데이트 + 스캔 단계 연동
 // -----------------------------
 function updateProgress() {
-  const ratio = Math.min(1, Math.max(0, scanTimer / scanTotal));
-  const width = ratio * 100;
-  progressBarInnerEl.style.width = `${width}%`;
-  progressTimeEl.textContent = `${formatTime(scanTimer)} / ${formatTime(
-    scanTotal
-  )}`;
   purityValueEl.textContent = `${Math.round(purity)}%`;
-
-  const remaining = Math.max(0, scanTotal - scanTimer);
-  remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
-  statusTimerEl.textContent = formatTime(scanTimer);
-
-  // 🔹 스캔 단계 문장 + 체크는 항상 로딩바 기준으로
-  if (
-    currentPhase === "A1-2" ||
-    currentPhase === "B1" ||
-    currentPhase === "B2" ||
-    currentPhase === "B3" ||
-    currentPhase === "C1"
-  ) {
-    updateScanSequence(ratio);
-  } else {
-    updateScanSequence(0);
-  }
 }
 
 // -----------------------------
@@ -940,6 +1012,9 @@ function startScanResultTransition() {
   if (scanResultStarted) return;
   scanResultStarted = true;
 
+  scanOverallTimer = SCAN_OVERALL_TOTAL;
+  updateProgress();
+
   setPhase("C1");
 
   const scanMainEl = document.querySelector(".scan-main");
@@ -1037,80 +1112,203 @@ function renderAnalysisResult() {
   const gutImageEl = document.getElementById("gutImage");
 
   const profile = analysisResult.profile;
-  const sm = analysisResult.socialMetrics;
-  const sni = analysisResult.sni;
+  const sm = analysisResult.socialMetrics || {};
+  const sni = analysisResult.sni ?? 0.5;
 
+  // ---- 전체 점수 / 퍼센트 ----
+  const overallScore = Math.max(0, Math.min(1, sni));
+  const overallScoreText = overallScore.toFixed(2);
+  const overallPercentText = Math.round(overallScore * 100);
+
+  // 점수 → 등급 (A~D)
+  const gradeFromScore = (score, invert = false) => {
+    let v = Math.max(0, Math.min(1, score));
+    if (invert) v = 1 - v; // 높을수록 나쁜 지표(CFI 등)는 뒤집어서 등급 계산
+    if (v >= 0.8) return "A";
+    if (v >= 0.6) return "B";
+    if (v >= 0.4) return "C";
+    return "D";
+  };
+
+  const pct = (x) => `${Math.round(x * 100)}%`;
+
+  // 각 카테고리용 값
+  const diversityScore = 1 - (sm.NRS ?? 0.5); // NRS 높음 = 정상 범위 좁음 → 뒤집어서 "다양성" 점수
+  const conformityScore = sm.CS ?? 0.5;
+  const cohesionScore = sm.CI ?? 0.5;
+  const conflictScore = sm.CFI ?? 0.5; // 높을수록 갈등↑
+  const productivityScore = sm.PS ?? 0.5;
+
+  const diversityGrade = gradeFromScore(diversityScore);
+  const conformityGrade = gradeFromScore(conformityScore);
+  const cohesionGrade = gradeFromScore(cohesionScore);
+  const conflictGrade = gradeFromScore(conflictScore, true); // 갈등은 낮을수록 좋음
+  const productivityGrade = gradeFromScore(productivityScore);
+
+  // 설명 문구 간단 로직
+  const diversityText =
+    diversityScore >= 0.7
+      ? "다양한 미생물이 공존하고 있습니다. 사회적으로는 여러 정체성이 공존하는 포용적 상태에 가깝습니다."
+      : diversityScore >= 0.4
+      ? "다양성은 유지되고 있으나 일부 종이 과도하게 우세해지고 있습니다. 사회적으로는 특정 정상성이 강하게 작동하는 상태입니다."
+      : "장내 다양성이 낮아 획일화된 생태계에 가깝습니다. 사회적으로는 한 가지 기준만 강요되는 비포용적 상태로 읽힙니다.";
+
+  const conformityText =
+    conformityScore >= 0.7
+      ? "유익균 비율이 높고 병원성 미생물은 낮은 편입니다. 규범을 잘 따르는 순응형 시민에 가까운 프로파일입니다."
+      : conformityScore >= 0.4
+      ? "유익균과 잠재적 병원균이 섞여 있습니다. 사회 규범에 대체로 맞지만 때때로 경계 대상이 되는 존재로 읽힙니다."
+      : "병원성·잠재적 유해균의 비율이 높습니다. 사회가 쉽게 '문제적'으로 낙인찍을 수 있는 몸의 상태로 해석됩니다.";
+
+  const cohesionText =
+    cohesionScore >= 0.7
+      ? "SCFA(특히 Butyrate) 생산이 활발해 공동체 결속 에너지가 높은 상태입니다. 서로를 지탱하는 힘이 충분합니다."
+      : cohesionScore >= 0.4
+      ? "기초 에너지는 유지되지만 결속력이 흔들릴 수 있는 수준입니다. 사회적으로는 관계망이 느슨해지는 과도기입니다."
+      : "SCFA 생산이 떨어져 에너지 부족 상태에 가깝습니다. 사회적으로는 서로를 지탱할 힘이 부족한, 해체 직전의 공동체에 비유할 수 있습니다.";
+
+  const conflictText =
+    conflictScore >= 0.7
+      ? "LPS와 염증성 사이토카인이 높아 만성 염증 상태에 가깝습니다. 사회적으로는 혐오·갈등이 일상화된 고강도 분열 상태입니다."
+      : conflictScore >= 0.4
+      ? "염증 지표가 다소 상승한 상태입니다. 사회적으로는 갈등 이슈가 반복적으로 나타나며 긴장이 계속 유지되는 국면입니다."
+      : "염증 지표가 낮아 비교적 안정적인 상태입니다. 사회적으로는 갈등이 국소적으로 발생하더라도 빠르게 봉합되는 편입니다.";
+
+  const productivityText =
+    productivityScore >= 0.7
+      ? "장 내 대사 효율이 높아 에너지를 잉여까지 확보하는 상태입니다. 사회적으로는 고효율·고생산성을 강하게 요구받는 위치에 있습니다."
+      : productivityScore >= 0.4
+      ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 사회적으로는 평균적인 생산성을 가진 시민으로 평가됩니다."
+      : "대사 효율이 낮아 에너지 확보가 버겁습니다. 사회적으로는 '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
+
+  // 장 그림
   if (gutVisualEl) gutVisualEl.style.display = "block";
-
-  if (gutImageEl && sni != null) {
-    if (sni >= 0.7) {
+  if (gutImageEl) {
+    if (overallScore >= 0.7) {
       gutImageEl.src = "assets/img/gut-good.png";
-    } else if (sni >= 0.4) {
+    } else if (overallScore >= 0.4) {
       gutImageEl.src = "assets/img/gut-neutral.png";
     } else {
       gutImageEl.src = "assets/img/gut-bad.png";
     }
   }
 
+  // 실제 DOM 출력
   resultListEl.style.display = "block";
-
-  const fmt = (x) => (typeof x === "number" ? x.toFixed(2) : x);
-
   resultListEl.innerHTML = `
-    <h3>장내 상태 요약</h3>
-    <p>
-      당신의 장내 생태계는
-      <strong>${
-        analysisResult.diversityGrade
-      }</strong> 수준의 다양성을 가지고 있으며,
-      정서 안정도는 <strong>${
-        analysisResult.emotionalStability
-      }</strong>로 평가되었습니다.
-    </p>
-    <p>
-      사회 적응도 지수는 <strong>${analysisResult.socialAdaptation}</strong>,
-      사회 효율 환산가는 <strong>${
-        analysisResult.socialEfficiency
-      }</strong>입니다.
-    </p>
+    <div class="gut-report">
+      <!-- 좌측: 전체 점수 + 장내 이미지 -->
+      <section class="gut-report-main">
+        <div class="gut-report-overall">
+          <div class="gut-report-overall-label">사회 적응도</div>
+          <div class="gut-report-overall-score">${overallScoreText}</div>
+          <p class="gut-report-overall-sub">
+            귀하의 장내 생태는 <strong>사회 적응도 ${overallScoreText}</strong>로 환산되었습니다.
+          </p>
+          <p class="gut-report-overall-desc">
+            이 점수는 장내 다양성, 규범 적합도, 공동체 결속, 갈등·염증 지표, 대사 효율을 통합하여 계산한
+            <strong>사회 정상성 지수</strong>입니다. 점수가 높을수록 현재 사회가 요구하는 기준에 잘 맞는
+            몸의 상태로 평가되며, 낮을수록 다른 형태의 가능성을 품은 상태로 읽을 수 있습니다.
+          </p>
+        </div>
 
-    <h4>장내 지표</h4>
-    <ul>
-      <li>다양성 지수 (D): <strong>${fmt(profile.D)}</strong></li>
-      <li>유익균 비율 (B): <strong>${fmt(profile.B)}</strong></li>
-      <li>병원성/유해균 비율 (P): <strong>${fmt(profile.P)}</strong></li>
-      <li>Butyrate 생산량 (Bt): <strong>${fmt(profile.Bt)}</strong></li>
-      <li>LPS 수치 (L): <strong>${fmt(profile.L)}</strong></li>
-      <li>Cytokine 점수 (C): <strong>${fmt(profile.C)}</strong></li>
-      <li>대사 효율 (EEE): <strong>${fmt(profile.EEE)}</strong></li>
-    </ul>
+        <div class="gut-report-visual">
+          <div class="gut-report-gut-image">
+            ${gutImageEl ? gutImageEl.outerHTML : ""}
+          </div>
+          <div class="gut-report-gut-caption">
+            장내 생태를 사회 인프라로 번역한 시각화입니다.
+          </div>
+        </div>
+      </section>
 
-    <h4>사회적 정상성 해석</h4>
-    <ul>
-      <li>정상성 허용 범위 (NRS): <strong>${fmt(
-        sm.NRS * 100
-      )}%</strong> — 값이 높을수록 사회가 허용하는 '정상'의 폭이 좁습니다.</li>
-      <li>규범 적합도 (CS): <strong>${fmt(
-        sm.CS * 100
-      )}%</strong> — 사회 규범에 얼마나 잘 맞는지의 지표입니다.</li>
-      <li>공동체 결속 에너지 (CI): <strong>${fmt(sm.CI * 100)}%</strong></li>
-      <li>갈등·혐오 지수 (CFI): <strong>${fmt(sm.CFI * 100)}%</strong></li>
-      <li>생산성 지수 (PS): <strong>${fmt(sm.PS * 100)}%</strong></li>
-      <li>정상성 압력 (NPI): <strong>${fmt(sm.NPI * 100)}%</strong></li>
-      <li>낙인 지수 (SS): <strong>${fmt(sm.SS * 100)}%</strong></li>
-    </ul>
+      <!-- 우측: 다섯 가지 범주 카드 -->
+      <section class="gut-report-cards">
+        <article class="gut-card gut-card--diversity">
+          <header class="gut-card-header">
+            <h3 class="gut-card-title">장내 다양성 &amp; 정상성의 폭</h3>
+            <div class="gut-card-grade">
+              <span class="gut-card-grade-letter">${diversityGrade}</span>
+              <span class="gut-card-grade-score">${pct(diversityScore)}</span>
+            </div>
+          </header>
+          <p class="gut-card-metric">
+            Shannon 다양성 지수 D: <strong>${profile.D.toFixed(2)}</strong>
+          </p>
+          <p class="gut-card-text">
+            ${diversityText}
+          </p>
+        </article>
 
-    <p>
-      이 장내 데이터는 현재 사회가 요구하는 '정상성' 기준에 비추어 볼 때,
-      <strong>${
-        sni >= 0.7
-          ? "매우 효율적이고 규범에 잘 맞지만, 다양성과 여유는 부족한 상태"
-          : sni >= 0.4
-          ? "효율성과 다양성 사이에서 균형을 유지하는 상태"
-          : "정상성 기준에서는 벗어나 있지만, 다른 형태의 가능성을 품고 있는 상태"
-      }</strong>
-      로 해석될 수 있습니다.
-    </p>
+        <article class="gut-card gut-card--conformity">
+          <header class="gut-card-header">
+            <h3 class="gut-card-title">규범 적합도 (순응 점수)</h3>
+            <div class="gut-card-grade">
+              <span class="gut-card-grade-letter">${conformityGrade}</span>
+              <span class="gut-card-grade-score">${pct(conformityScore)}</span>
+            </div>
+          </header>
+          <p class="gut-card-metric">
+            유익균 비율 B: <strong>${profile.B.toFixed(2)}</strong>,
+            병원성 비율 P: <strong>${profile.P.toFixed(2)}</strong>
+          </p>
+          <p class="gut-card-text">
+            ${conformityText}
+          </p>
+        </article>
+
+        <article class="gut-card gut-card--cohesion">
+          <header class="gut-card-header">
+            <h3 class="gut-card-title">공동체 결속 에너지 (SCFA)</h3>
+            <div class="gut-card-grade">
+              <span class="gut-card-grade-letter">${cohesionGrade}</span>
+              <span class="gut-card-grade-score">${pct(cohesionScore)}</span>
+            </div>
+          </header>
+          <p class="gut-card-metric">
+            Butyrate 생산량 Bt: <strong>${profile.Bt.toFixed(1)}</strong>
+          </p>
+          <p class="gut-card-text">
+            ${cohesionText}
+          </p>
+        </article>
+
+        <article class="gut-card gut-card--conflict">
+          <header class="gut-card-header">
+            <h3 class="gut-card-title">갈등·혐오 지수 (염증 로드)</h3>
+            <div class="gut-card-grade">
+              <span class="gut-card-grade-letter">${conflictGrade}</span>
+              <span class="gut-card-grade-score">${pct(conflictScore)}</span>
+            </div>
+          </header>
+          <p class="gut-card-metric">
+            LPS L: <strong>${profile.L.toFixed(2)}</strong>,
+            Cytokine C: <strong>${profile.C.toFixed(1)}</strong>
+          </p>
+          <p class="gut-card-text">
+            ${conflictText}
+          </p>
+        </article>
+
+        <article class="gut-card gut-card--productivity">
+          <header class="gut-card-header">
+            <h3 class="gut-card-title">사회적 생산성/효율성</h3>
+            <div class="gut-card-grade">
+              <span class="gut-card-grade-letter">${productivityGrade}</span>
+              <span class="gut-card-grade-score">${pct(
+                productivityScore
+              )}</span>
+            </div>
+          </header>
+          <p class="gut-card-metric">
+            대사 효율 EEE: <strong>${profile.EEE.toFixed(2)}</strong>
+          </p>
+          <p class="gut-card-text">
+            ${productivityText}
+          </p>
+        </article>
+      </section>
+    </div>
   `;
 }
 
@@ -1158,6 +1356,18 @@ async function listCardToSupabase() {
 // -----------------------------
 function mainLoopTick() {
   const USE_PRESSURE_GUARD = false;
+
+  const isScanPhase =
+    currentPhase === "A1-2" ||
+    currentPhase === "B1" ||
+    currentPhase === "B2" ||
+    currentPhase === "B3" ||
+    currentPhase === "C1";
+
+  // 🔹 스캔 중일 때만 전역 타이머 증가
+  if (isScanPhase && scanOverallTimer < SCAN_OVERALL_TOTAL) {
+    scanOverallTimer++;
+  }
 
   if (USE_PRESSURE_GUARD && !pressureOn && currentPhase.startsWith("B")) {
     setPhase("D1");
@@ -1266,6 +1476,10 @@ if (debugStartBtn) {
     purity = 0;
     microProgress = 0;
     scanResultStarted = false;
+    scanOverallTimer = 0;
+
+    resetScanProgressUI();
+
     updateSensorStatus();
     setPhase("A0-1");
   });
@@ -1291,6 +1505,9 @@ if (btnReset) {
     purity = 0;
     microProgress = 0;
     scanResultStarted = false;
+
+    resetScanProgressUI();
+
     updateSensorStatus();
     setPhase("A0-1");
   });
@@ -1307,6 +1524,9 @@ if (btnYes) {
       purity = 0;
       microProgress = 0;
       scanResultStarted = false;
+
+      resetScanProgressUI();
+
       updateSensorStatus();
       setPhase("A0-1");
     }, 3000);
