@@ -6,32 +6,30 @@ const standbyScreenEl = document.getElementById("standbyScreen");
 const scanHeaderEl = document.getElementById("scanHeader");
 const scanRootEl = document.getElementById("scanRoot");
 
-// 🔹 이걸로 교체해
+// Standby 파티클 캔버스
 const standbyCanvas = document.getElementById("standbyParticles");
 const standbyCtx = standbyCanvas ? standbyCanvas.getContext("2d") : null;
 
+// 자세 안내 / 스캔 UI
 const postureEl = document.getElementById("scanPosture");
 const scanTopRowEl = document.getElementById("scanTopRow");
 const scanMainMessageEl = document.getElementById("scanMainMessage");
 const scanBottomEl = document.getElementById("scanBottom");
 const standbyHintEl = document.getElementById("standbyHint");
-
 const sensorSimEl = document.getElementById("sensorSim");
 
+// 자세 안내 텍스트/프로그레스
 const postureLine1El = document.getElementById("postureLine1");
 const postureLine2El = document.getElementById("postureLine2");
 const postureLine3El = document.getElementById("postureLine3");
 const postureLine4El = document.getElementById("postureLine4");
-
 const postureProgressInner = document.getElementById("postureProgressInner");
-// start 점은 빼고, data-step 있는 1·2·3만 대상으로
-// 🔹 시작점 없이, 실제 단계(1~4)만 선택
 const postureStepEls = document.querySelectorAll(".posture-step[data-step]");
 
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
-let currentPhase = "A0-1"; // A0-1, A0-2, A1-1, A1-2, B1, B2, B3, C1, C2, C3, C4, D1, D2 ...
+let currentPhase = "A0-1"; // A0-1, A0-2, A1-1, POSTURE, A1-2, B1, B2, B3, C1, C2, ...
 let pirOn = false;
 let pressureOn = false;
 
@@ -45,7 +43,7 @@ let lastPressureChangeTime = null;
 
 let postureTimers = [];
 
-// 결과에 쓸 가상의 분석값(장내 다양성 등)
+// 결과에 쓸 분석값
 let analysisResult = null;
 
 // DOM 참조
@@ -85,10 +83,14 @@ const btnReset = document.getElementById("btnReset");
 const textCanvas = document.createElement("canvas");
 const textCtx = textCanvas.getContext("2d");
 
+// 윈도우 리사이즈 시 3D 씬 리사이즈
 window.addEventListener("resize", () => {
   resizeMicrobes();
 });
 
+// -----------------------------
+// 텍스트 마스크 (Standby 로고용)
+// -----------------------------
 function buildTextTargets(text) {
   const w = standbyCanvas.width;
   const h = standbyCanvas.height;
@@ -98,19 +100,17 @@ function buildTextTargets(text) {
 
   textCtx.clearRect(0, 0, w, h);
 
-  // 글자 스타일 (나중에 폰트 바꿔도 됨)
   textCtx.fillStyle = "#ffffff";
   textCtx.textAlign = "center";
   textCtx.textBaseline = "middle";
   textCtx.font = "bold 64px 'Noto Sans KR', system-ui";
 
-  // 가운데에 큰 텍스트로 그리기
   textCtx.fillText(text, w / 2, h / 2);
 
   const imgData = textCtx.getImageData(0, 0, w, h).data;
 
   const points = [];
-  const step = 6; // 샘플링 간격(숫자 줄이면 더 촘촘한 글자)
+  const step = 6;
 
   for (let y = 0; y < h; y += step) {
     for (let x = 0; x < w; x += step) {
@@ -132,9 +132,10 @@ let particles = [];
 let standbyAnimReq = null;
 
 function initStandbyParticles() {
+  if (!standbyCanvas || !standbyCtx) return;
   resizeStandbyCanvas();
   particles = [];
-  const count = 30; // 파티클 개수
+  const count = 30;
   const w = standbyCanvas.width;
   const h = standbyCanvas.height;
 
@@ -148,21 +149,22 @@ function initStandbyParticles() {
       phase: Math.random() * Math.PI * 2,
       speed: 0.3 + Math.random() * 0.3,
       colorIndex: Math.random(),
-      // morph용
       targetX: null,
       targetY: null,
-      morphT: 0, // 0~1 사이 보간 값
-      mode: "idle", // "idle" | "morph"
+      morphT: 0,
+      mode: "idle",
     });
   }
 }
 
 function resizeStandbyCanvas() {
+  if (!standbyCanvas) return;
   standbyCanvas.width = window.innerWidth;
   standbyCanvas.height = window.innerHeight;
 }
 
 function drawStandbyParticles(time) {
+  if (!standbyCtx || !standbyCanvas) return;
   const t = time * 0.001;
   const ctx = standbyCtx;
   const w = standbyCanvas.width;
@@ -174,20 +176,17 @@ function drawStandbyParticles(time) {
     let x, y, r;
 
     if (p.mode === "idle") {
-      // 대기 상태: 몽글몽글 떠다니기
       const wobble = Math.sin(t * p.speed + p.phase) * 18;
       const wobble2 = Math.cos(t * p.speed * 0.7 + p.phase) * 18;
       x = p.baseX + wobble;
       y = p.baseY + wobble2;
       r = p.r + Math.sin(t * p.speed + p.phase * 1.3) * 10;
     } else if (p.mode === "morph") {
-      // 글자 형태로 응축되는 상태
       const wobble = Math.sin(t * p.speed + p.phase) * 3;
       const wobble2 = Math.cos(t * p.speed * 0.7 + p.phase) * 3;
 
-      // 0 → 1 로 점점 증가
       p.morphT = Math.min(1, p.morphT + 0.008);
-      const ease = p.morphT * p.morphT * (3 - 2 * p.morphT); // smoothstep
+      const ease = p.morphT * p.morphT * (3 - 2 * p.morphT);
 
       const fromX = p.baseX;
       const fromY = p.baseY;
@@ -200,7 +199,6 @@ function drawStandbyParticles(time) {
     }
 
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    // 보라-청록-주황 계열
     if (p.colorIndex < 0.33) {
       g.addColorStop(0, "rgba(244, 187, 146, 0.8)");
       g.addColorStop(1, "rgba(24, 6, 43, 0)");
@@ -232,28 +230,31 @@ function formatTime(sec) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+// -----------------------------
+// Phase 전환
+// -----------------------------
 function setPhase(phase) {
   currentPhase = phase;
-  statusPhaseEl.textContent = phase;
-  warningMessageEl.style.display = "none";
-  resultListEl.style.display = "none";
-  decisionButtonsEl.style.display = "none";
+  if (statusPhaseEl) statusPhaseEl.textContent = phase;
+  if (warningMessageEl) warningMessageEl.style.display = "none";
+  if (resultListEl) resultListEl.style.display = "none";
+  if (decisionButtonsEl) decisionButtonsEl.style.display = "none";
 
-  // ★ A0 단계에서는: standby만 보이고, 헤더/스캔 UI는 안 보이게
   const isStandby = phase === "A0-1" || phase === "A0-2";
+
   if (isStandby) {
-    standbyScreenEl.style.display = "block";
-    scanHeaderEl.style.display = "none";
-    scanRootEl.style.display = "none";
+    if (standbyScreenEl) standbyScreenEl.style.display = "block";
+    if (scanHeaderEl) scanHeaderEl.style.display = "none";
+    if (scanRootEl) scanRootEl.style.display = "none";
 
     if (!standbyAnimReq) {
       initStandbyParticles();
       standbyAnimReq = requestAnimationFrame(drawStandbyParticles);
     }
   } else {
-    standbyScreenEl.style.display = "none";
-    scanHeaderEl.style.display = "flex";
-    scanRootEl.style.display = "flex";
+    if (standbyScreenEl) standbyScreenEl.style.display = "none";
+    if (scanHeaderEl) scanHeaderEl.style.display = "flex";
+    if (scanRootEl) scanRootEl.style.display = "flex";
 
     if (standbyAnimReq) {
       cancelAnimationFrame(standbyAnimReq);
@@ -261,14 +262,10 @@ function setPhase(phase) {
     }
   }
 
-  // 상태에 따라 배경 비주얼과 텍스트 세팅
   switch (phase) {
-    case "A0-1": // 대기
-      // 힌트 다시 보이게
-      if (standbyHintEl) {
-        standbyHintEl.style.display = "block";
-      }
-      statusSystemEl.textContent = "IDLE";
+    case "A0-1":
+      if (standbyHintEl) standbyHintEl.style.display = "block";
+      if (statusSystemEl) statusSystemEl.textContent = "IDLE";
       mainMessageEl.textContent = "장내자산관리공단입니다.";
       subMessageEl.textContent = "관람객 접근을 기다리고 있습니다.";
       secondaryMessageEl.textContent =
@@ -281,8 +278,8 @@ function setPhase(phase) {
       showMicrobes(false);
       break;
 
-    case "A0-2": // 접근 감지
-      statusSystemEl.textContent = "READY";
+    case "A0-2":
+      if (statusSystemEl) statusSystemEl.textContent = "READY";
       mainMessageEl.textContent = "착석 시 스캔 절차가 시작됩니다.";
       subMessageEl.textContent = "몇 초간 안정된 자세를 유지해 주세요.";
       secondaryMessageEl.textContent =
@@ -292,37 +289,27 @@ function setPhase(phase) {
       showMicrobes(false);
       break;
 
-    case "A1-1": // 착석 확인 = 자세 안내 화면
-      statusSystemEl.textContent = ""; // 상태 텍스트 안 씀
-
-      // 1) 시스템용 텍스트/상단/하단 UI 전부 숨기기
+    case "A1-1":
+      if (statusSystemEl) statusSystemEl.textContent = "";
       if (scanTopRowEl) scanTopRowEl.style.display = "none";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
       if (scanBottomEl) scanBottomEl.style.display = "none";
-      warningMessageEl.style.display = "none";
-      resultListEl.style.display = "none";
-
-      // 2) 자세 안내 전용 블록만 보이게
+      if (warningMessageEl) warningMessageEl.style.display = "none";
+      if (resultListEl) resultListEl.style.display = "none";
       if (postureEl) postureEl.style.display = "flex";
-
-      // 3) 배경은 부드럽게
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.5;
       break;
 
     case "POSTURE": {
-      statusSystemEl.textContent = "";
-
-      // 상단/UI 숨기기
+      if (statusSystemEl) statusSystemEl.textContent = "";
       if (scanHeaderEl) scanHeaderEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "none";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
       if (scanBottomEl) scanBottomEl.style.display = "none";
       if (sensorSimEl) sensorSimEl.style.display = "none";
-      warningMessageEl.style.display = "none";
-      resultListEl.style.display = "none";
-
-      // posture 화면만 보이게
+      if (warningMessageEl) warningMessageEl.style.display = "none";
+      if (resultListEl) resultListEl.style.display = "none";
       if (postureEl) postureEl.style.display = "flex";
 
       scanBgEl.className = "scan-bg particles";
@@ -333,7 +320,6 @@ function setPhase(phase) {
       const postureTitleEl = document.querySelector(".posture-message");
       const stepperEl = document.querySelector(".posture-stepper");
 
-      // 🔹 4단계 문장
       const seq = [
         "등을 곧게 세우고 상체를 안정시켜 주세요.",
         "배에 힘을 주어 장 쪽으로 압력을 모아 주세요.",
@@ -344,7 +330,6 @@ function setPhase(phase) {
       let idx = 0;
       let currentProgress = 0;
 
-      // 🔥 여기서 완전 리셋
       if (seqText) {
         seqText.style.opacity = 0;
         seqText.innerText = "";
@@ -357,10 +342,7 @@ function setPhase(phase) {
         const check = el.querySelector(".posture-step-check");
         if (check) check.style.opacity = "0";
       });
-      if (stepperEl) {
-        stepperEl.style.opacity = 1;
-      }
-      // 그래픽·제목·부제 복구
+      if (stepperEl) stepperEl.style.opacity = 1;
       if (postureGraphicEl) {
         postureGraphicEl.style.display = "block";
         postureGraphicEl.style.opacity = 1;
@@ -376,12 +358,11 @@ function setPhase(phase) {
           "잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.";
       }
 
-      // SVG 강조 애니메이션 (단계마다 강도 점점 ↑)
       function pumpSVG(stepIndex) {
         const img = document.getElementById("postureImg");
         if (!img) return;
         const base = 1.05;
-        const extra = stepIndex * 0.02; // 단계가 뒤로 갈수록 조금 더 세게
+        const extra = stepIndex * 0.02;
         const scale = base + extra;
 
         img.style.transition = "transform 0.35s ease";
@@ -389,7 +370,6 @@ function setPhase(phase) {
         setTimeout(() => (img.style.transform = "scale(1.0)"), 350);
       }
 
-      // 부드러운 로딩바 애니메이션
       function animateProgressTo(targetPercent, onDone) {
         const duration = 1100;
         const interval = 50;
@@ -419,7 +399,6 @@ function setPhase(phase) {
         postureTimers.push(id);
       }
 
-      // 스캔씬으로 넘어가기
       function goToScanPhase() {
         setPhase("A1-2");
         scanTimer = 0;
@@ -431,27 +410,18 @@ function setPhase(phase) {
         if (!seqText) return;
 
         const lastIndex = seq.length - 1;
+        if (idx > lastIndex) return;
 
-        if (idx > lastIndex) {
-          // 이미 끝난 상태면 아무 것도 안 함
-          return;
-        }
-
-        // 1) 같은 자리에서 문장 교체
         seqText.innerText = seq[idx];
         seqText.style.opacity = 1;
 
-        // 2) 문장만 먼저 충분히 보이게 (1.4초)
         const t1 = setTimeout(() => {
-          // 3) SVG 강하게 한 번 펌핑 (단계마다 강도 ↑)
           pumpSVG(idx);
 
-          // 4) 펌핑 끝난 뒤 로딩바 부드럽게 채우기
           const t2 = setTimeout(() => {
-            const target = ((idx + 1) / seq.length) * 100; // 25, 50, 75, 100
+            const target = ((idx + 1) / seq.length) * 100;
 
             animateProgressTo(target, () => {
-              // 5) 로딩바가 해당 지점까지 다 채워진 뒤 → 그 지점에 체크
               if (postureStepEls && postureStepEls[idx]) {
                 postureStepEls[idx].classList.add("completed");
                 const check = postureStepEls[idx].querySelector(
@@ -461,42 +431,30 @@ function setPhase(phase) {
               }
 
               if (idx === lastIndex) {
-                // 🔚 마지막 단계: 여기까지 온 시점에서
-                // → 바는 100%, 체크 4개 모두 켜진 상태
-
-                // 5-1) 잠깐 여운 (0.8초)
                 const afterFullTimer = setTimeout(() => {
-                  // 5-2) 인포그래픽 / 제목 / 부제 / 스텝퍼 전부 사라짐
                   if (postureGraphicEl) postureGraphicEl.style.display = "none";
                   if (stepperEl) stepperEl.style.opacity = 0;
                   if (postureTitleEl) postureTitleEl.style.opacity = 0;
                   if (postureLine4El) postureLine4El.style.opacity = 0;
 
-                  // 5-3) 문장 영역을 감지 문구로 교체
                   seqText.style.opacity = 0;
                   const showDetectTimer = setTimeout(() => {
                     seqText.innerText =
                       "장내 배출 데이터가 감지되었습니다. 장내 데이터 정렬을 시작합니다.";
                     seqText.style.opacity = 1;
                   }, 400);
-
                   postureTimers.push(showDetectTimer);
 
-                  // 5-4) 감지 문장만 충분히 보여준 뒤(3초) 스캔씬으로 이동
                   const toScanTimer = setTimeout(() => {
                     goToScanPhase();
-                  }, 3400); // 0.4 + 3.0
-
+                  }, 3400);
                   postureTimers.push(toScanTimer);
                 }, 800);
 
                 postureTimers.push(afterFullTimer);
               } else {
-                // 🔁 중간 단계들: 문장 사라지고 다음 문장으로
                 const tFadeOut = setTimeout(() => {
                   seqText.style.opacity = 0;
-
-                  // 문장 사이 텀 조금 더 길게 (0.9초)
                   const tNext = setTimeout(() => {
                     idx++;
                     nextSentence();
@@ -507,15 +465,14 @@ function setPhase(phase) {
                 postureTimers.push(tFadeOut);
               }
             });
-          }, 500); // 펌핑 이후 숨 고르기
+          }, 500);
 
           postureTimers.push(t2);
-        }, 1400); // 문장만 먼저 보이는 시간
+        }, 1400);
 
         postureTimers.push(t1);
       }
 
-      // 기존 타이머 정리 후 시작
       postureTimers.forEach(clearTimeout);
       postureTimers = [];
       nextSentence();
@@ -524,14 +481,11 @@ function setPhase(phase) {
     }
 
     case "A1-2":
-      // 자세 안내 숨기기
       if (postureEl) postureEl.style.display = "none";
-
-      // 상단/메인/하단 UI 다시 활성화
       if (scanTopRowEl) scanTopRowEl.style.display = "flex";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "block";
       if (scanBottomEl) scanBottomEl.style.display = "flex";
-      if (sensorSimEl) sensorSimEl.style.display = "flex"; // 스캔 씬에서만 필요하면 남기고, 아니라면 지워
+      if (sensorSimEl) sensorSimEl.style.display = "flex";
 
       mainMessageEl.textContent = "초기 상태를 측정하고 있습니다.";
       subMessageEl.textContent = "몇 초간 안정된 자세를 유지해 주세요.";
@@ -539,69 +493,69 @@ function setPhase(phase) {
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.7;
 
-      // 스캔 시작하자마자 미생물 등장
-      microProgress = 0.25; // 처음엔 살짝만 보이게
+      scanTimer = 0;
+      scanTotal = 30;
+      purity = 0;
+      updateProgress();
+
+      microProgress = 0.25;
       showMicrobes(true);
+
       break;
 
-    case "B1": // 안정화
-      statusSystemEl.textContent = "SCANNING";
+    case "B1":
+      if (statusSystemEl) statusSystemEl.textContent = "SCANNING";
       mainMessageEl.textContent = "신체 데이터를 정렬하고 있습니다.";
       subMessageEl.textContent = "천천히 호흡하며 자세를 유지해 주세요.";
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.6;
-
-      showMicrobes(true); // ✅ 여기 켜져 있어야 함
+      showMicrobes(true);
       break;
 
-    case "B2": // 힘 주기
-      statusSystemEl.textContent = "SCANNING";
+    case "B2":
+      if (statusSystemEl) statusSystemEl.textContent = "SCANNING";
       mainMessageEl.textContent = "이제 힘을 주세요.";
       subMessageEl.textContent = "숨을 들이 마시고, 천천히 힘을 모아 주세요.";
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.65;
-
       showMicrobes(true);
       break;
 
-    case "B3": // 힘 풀고 안정
-      statusSystemEl.textContent = "SCANNING";
+    case "B3":
+      if (statusSystemEl) statusSystemEl.textContent = "SCANNING";
       mainMessageEl.textContent = "이제 힘을 풀고, 그대로 유지해 주세요.";
       subMessageEl.textContent = "정제된 데이터가 내부에서 정리되고 있습니다.";
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg noise";
       scanBgEl.style.opacity = 0.6;
-
       showMicrobes(true);
       break;
 
-    case "C1": // 응축 + 완료 알림
-      statusSystemEl.textContent = "COMPLETING";
+    case "C1":
+      if (statusSystemEl) statusSystemEl.textContent = "COMPLETING";
       mainMessageEl.textContent = "스캔이 완료되었습니다.";
       subMessageEl.textContent = "정제된 장내 데이터 분석을 진행합니다.";
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.8;
-
       showMicrobes(true);
       break;
 
-    case "C2": // 결과 화면
-      statusSystemEl.textContent = "RESULT";
+    case "C2":
+      if (statusSystemEl) statusSystemEl.textContent = "RESULT";
       mainMessageEl.textContent = "장내 데이터 분석 결과입니다.";
       subMessageEl.textContent = "";
       secondaryMessageEl.textContent =
         "이 장내 데이터를 사회 자산으로 상장하시겠습니까?";
       decisionButtonsEl.style.display = "flex";
       renderAnalysisResult();
-
       showMicrobes(false);
       break;
 
-    case "C3": // YES 상장 진행
-      statusSystemEl.textContent = "LISTING";
+    case "C3":
+      if (statusSystemEl) statusSystemEl.textContent = "LISTING";
       mainMessageEl.textContent = "상장 절차를 진행합니다.";
       subMessageEl.textContent =
         "정제된 장내 데이터가 공단 시스템으로 전송되고 있습니다. 뒤쪽 화면에서 상장 결과를 확인해 주세요.";
@@ -610,8 +564,8 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.9;
       break;
 
-    case "C4": // NO 상장 거부
-      statusSystemEl.textContent = "DECLINED";
+    case "C4":
+      if (statusSystemEl) statusSystemEl.textContent = "DECLINED";
       mainMessageEl.textContent = "상장을 진행하지 않았습니다.";
       subMessageEl.textContent =
         "귀하의 장내 데이터 가치는 매우 우수했습니다. 사회에 기여할 수 있는 기회를 놓치셨습니다.";
@@ -620,8 +574,8 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.3;
       break;
 
-    case "D1": // 중도 이탈
-      statusSystemEl.textContent = "INTERRUPTED";
+    case "D1":
+      if (statusSystemEl) statusSystemEl.textContent = "INTERRUPTED";
       mainMessageEl.textContent = "착석이 해제되었습니다.";
       subMessageEl.textContent =
         "다시 앉으시면 이어서 진행됩니다. 장 시간이 비워지는 중...";
@@ -630,8 +584,8 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.5;
       break;
 
-    case "D2": // 압력 유지 실패 / 데이터 부족
-      statusSystemEl.textContent = "INTERRUPTED";
+    case "D2":
+      if (statusSystemEl) statusSystemEl.textContent = "INTERRUPTED";
       mainMessageEl.textContent = "충분한 데이터가 수집되지 않았습니다.";
       subMessageEl.textContent = "다시 앉아 안정된 자세로 진행해 주세요.";
       secondaryMessageEl.textContent =
@@ -646,13 +600,19 @@ function setPhase(phase) {
   }
 }
 
+// -----------------------------
+// 센서 표시
+// -----------------------------
 function updateSensorStatus() {
-  statusPirEl.textContent = pirOn ? "ON" : "OFF";
-  statusPressureEl.textContent = pressureOn ? "ON" : "OFF";
+  if (statusPirEl) statusPirEl.textContent = pirOn ? "ON" : "OFF";
+  if (statusPressureEl)
+    statusPressureEl.textContent = pressureOn ? "ON" : "OFF";
 }
 
+// -----------------------------
+// 진행바 업데이트
+// -----------------------------
 function updateProgress() {
-  // B 단계에서만 의미 있게 사용, 나머지는 0~100 중 일부
   const ratio = Math.min(1, Math.max(0, scanTimer / scanTotal));
   const width = ratio * 100;
   progressBarInnerEl.style.width = `${width}%`;
@@ -666,7 +626,9 @@ function updateProgress() {
   statusTimerEl.textContent = formatTime(scanTimer);
 }
 
-// 🔹 3D 미생물 씬 -----------------------------
+// -----------------------------
+// 3D 미생물 씬
+// -----------------------------
 const scanMicrobesCanvas = document.getElementById("scanMicrobes");
 
 let microScene = null;
@@ -680,7 +642,6 @@ let microLoaded = false;
 
 let microProgress = 0;
 
-// ❗ 실제 파일 이름에 맞게 수정해줘
 const MICRO_MODEL_PATHS = [
   "assets/models/Microbiome_1.glb",
   "assets/models/Microbiome_2.glb",
@@ -703,10 +664,9 @@ function initMicrobeScene() {
   microRenderer.setSize(width, height);
 
   microScene = new THREE.Scene();
-  microScene.fog = new THREE.FogExp2(0x050816, 0.015); // 살짝 더 진한 안개
+  microScene.fog = new THREE.FogExp2(0x050816, 0.015);
 
   microCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
-  // 기본은 조금 떨어져 있다가 → 점점 줌 인 할 거라 여기선 베이스만
   microCamera.position.set(0, 0, 55);
 
   const amb = new THREE.AmbientLight(0xffffff, 0.7);
@@ -715,7 +675,7 @@ function initMicrobeScene() {
   microScene.add(amb, dir);
 
   microGroup = new THREE.Group();
-  microGroup.position.z = -6; // 너무 멀리 가지 말고 가까운 층에
+  microGroup.position.z = -6;
   microScene.add(microGroup);
 
   const loader = new window.GLTFLoader();
@@ -734,38 +694,34 @@ function initMicrobeScene() {
 
   Promise.all(loadPromises)
     .then((scenes) => {
-      const COUNT = 70; // 개체 수는 조금 많은데, 처음엔 일부만 등장시킴
+      const COUNT = 70;
 
       for (let i = 0; i < COUNT; i++) {
         const baseScene = scenes[i % scenes.length].clone(true);
-
         const wrapper = new THREE.Group();
         wrapper.add(baseScene);
 
-        // 기본 반지름: 처음엔 거의 중앙(2~4), 최대 12 정도까지 퍼짐
-        const baseRadius = 2 + Math.random() * 10; // 2 ~ 12
+        const baseRadius = 2 + Math.random() * 10;
         const baseAngle = Math.random() * Math.PI * 2;
-        const baseHeight = (Math.random() - 0.5) * 4; // 살짝 위아래
+        const baseHeight = (Math.random() - 0.5) * 4;
 
-        // 초기 위치는 거의 중앙 근처
         wrapper.position.set(
           Math.cos(baseAngle) * 0.5,
           Math.sin(baseAngle) * 0.5,
           baseHeight * 0.1
         );
 
-        const baseScale = 0.16 + Math.random() * 0.12; // 좀 더 크게
-
+        const baseScale = 0.16 + Math.random() * 0.12;
         wrapper.scale.set(baseScale, baseScale, baseScale);
 
         wrapper.userData = {
-          baseRadius, // 최대로 퍼질 거리
-          baseAngle, // 기본 각도
-          baseHeight, // 기본 높이
+          baseRadius,
+          baseAngle,
+          baseHeight,
           baseScale,
           offset: Math.random() * 1000,
           swirlDir: Math.random() > 0.5 ? 1 : -1,
-          spawnOffset: Math.random(), // 0~1 사이: 언제 등장할지
+          spawnOffset: Math.random(),
         };
 
         microGroup.add(wrapper);
@@ -800,39 +756,34 @@ function animateMicrobes() {
   const now = performance.now();
   const t = (now - microStartTime) * 0.001;
 
-  // 🔹 현재 단계에 따른 “목표 진행도” (0~1) – 계단식으로만 변함
   let targetProgress = 0;
   if (currentPhase === "A1-2") {
-    targetProgress = 0.25; // 캘리브레이션 시작: 중앙에 몇 개만
+    targetProgress = 0.25;
   } else if (currentPhase === "B1") {
-    targetProgress = 0.45; // 안정화 구간
+    targetProgress = 0.45;
   } else if (currentPhase === "B2") {
-    targetProgress = 0.75; // 힘 주는 구간: 꽤 많이
+    targetProgress = 0.75;
   } else if (currentPhase === "B3" || currentPhase === "C1") {
-    targetProgress = 1.0; // 스캔 막바지: 꽉 찬 느낌
+    targetProgress = 1.0;
   } else {
-    targetProgress = 0; // 나머지 단계에서는 서서히 꺼질 준비
+    targetProgress = 0;
   }
 
-  // 🔹 microProgress를 프레임마다 서서히 target으로 수렴시키기 → 스무스
-  microProgress += (targetProgress - microProgress) * 0.05; // 0.05 정도면 부드럽게
+  microProgress += (targetProgress - microProgress) * 0.05;
 
-  // 🔹 카메라 줌 인: 진행될수록 점점 가까이
   const camStartZ = 55;
-  const camEndZ = 28; // 최종엔 꽤 크게 보이게
+  const camEndZ = 28;
   const camZ = camStartZ - (camStartZ - camEndZ) * microProgress;
   microCamera.position.z = camZ;
   microCamera.lookAt(0, 0, 0);
   microCamera.updateProjectionMatrix();
 
-  // 그룹 전체도 약간 천천히 회전
   microGroup.rotation.y = Math.sin(t * 0.12) * 0.25;
   microGroup.rotation.x = Math.sin(t * 0.07) * 0.08;
 
   microGroup.children.forEach((wrapper) => {
     const d = wrapper.userData;
 
-    // 🔹 개체별 등장 타이밍: spawnOffset 기준으로 순차 등장
     let appear = (microProgress * 1.2 - d.spawnOffset) / 0.5;
     if (appear < 0) appear = 0;
     if (appear > 1) appear = 1;
@@ -843,10 +794,8 @@ function animateMicrobes() {
     }
     wrapper.visible = true;
 
-    // 🔹 반지름: 처음엔 중앙 → 진행될수록 자신의 baseRadius까지 퍼짐
     const r = d.baseRadius * (0.2 + 0.8 * appear);
 
-    // 🔹 미생물 "헤엄" 느낌: 작은 범위에서 꿈틀거리기
     const swimPhase = t * 0.9 + d.offset;
     const wobbleSmall = Math.sin(swimPhase * 1.3) * 0.4;
     const wobbleSmall2 = Math.cos(swimPhase * 1.1) * 0.4;
@@ -863,12 +812,10 @@ function animateMicrobes() {
 
     wrapper.position.set(x, y, z);
 
-    // 🔹 회전: 살짝 비틀거리면서 헤엄치는 느낌
     wrapper.rotation.x += 0.015 * d.swirlDir;
     wrapper.rotation.y += 0.02;
     wrapper.rotation.z += Math.sin(t * 0.8 + d.offset) * 0.004;
 
-    // 🔹 스케일: 등장하면서 커지고, 숨 쉬듯이 살짝씩 변함
     const breath = 1 + Math.sin(t * 1.6 + d.offset) * 0.15;
     const s = d.baseScale * (0.4 + 0.8 * appear) * breath;
     wrapper.scale.set(s, s, s);
@@ -886,7 +833,6 @@ function showMicrobes(active) {
     initMicrobeScene();
     resizeMicrobes();
 
-    // 로딩 끝나기 전에는 투명, 다 로드되면 0.9로
     scanMicrobesCanvas.style.opacity = microLoaded ? 0.9 : 0.0;
 
     if (!microAnimReq) {
@@ -905,36 +851,190 @@ function showMicrobes(active) {
 // -----------------------------
 // 분석 결과 & ID 카드 생성
 // -----------------------------
+
+let scanResultStarted = false;
+
+function startScanResultTransition() {
+  if (scanResultStarted) return;
+  scanResultStarted = true;
+
+  setPhase("C1");
+
+  const scanMainEl = document.querySelector(".scan-main");
+
+  if (scanMainEl) {
+    scanMainEl.classList.add("scan-fade-out");
+  }
+
+  setTimeout(() => {
+    const profile = createRandomGutProfile();
+    analysisResult = generateAnalysisFromGutProfile(profile);
+
+    setPhase("C2");
+
+    if (scanMainEl) {
+      scanMainEl.classList.remove("scan-fade-out");
+      scanMainEl.classList.add("scan-fade-in");
+      setTimeout(() => {
+        scanMainEl.classList.remove("scan-fade-in");
+      }, 600);
+    }
+  }, 800);
+}
+
+function normalize(x, min, max) {
+  return Math.min(1, Math.max(0, (x - min) / (max - min)));
+}
+
+function mapGutToSocial(profile) {
+  const D_norm = normalize(profile.D, 1.5, 4.0);
+  const NRS = 1 - D_norm;
+
+  const CS = profile.B * 0.7 + (1 - profile.P) * 0.3;
+
+  const Bt_norm = normalize(profile.Bt, 10, 50);
+  const CI = Bt_norm;
+
+  const L_norm = normalize(profile.L, 0.05, 1.0);
+  const C_norm = normalize(profile.C, 0, 100);
+  const CFI = L_norm * 0.6 + C_norm * 0.4;
+
+  const PS = profile.EEE;
+
+  const NPI = 1 - profile.beta;
+
+  const SS = profile.P;
+
+  const weights = {
+    NRS: 0.15,
+    CS: 0.2,
+    CI: 0.1,
+    CFI: 0.2,
+    PS: 0.1,
+    NPI: 0.15,
+    SS: 0.1,
+  };
+
+  const sni =
+    NRS * weights.NRS +
+    CS * weights.CS +
+    CI * weights.CI +
+    CFI * weights.CFI +
+    PS * weights.PS +
+    NPI * weights.NPI +
+    SS * weights.SS;
+
+  return { NRS, CS, CI, CFI, PS, NPI, SS, sni };
+}
+
 function generateAnalysisFromGutProfile(profile) {
-  // 이 부분은 나중에 너가 맘대로 바꿀 수 있음
-  // 지금은 D/B/P 등에서 간단히 등급 뽑는 예시
-  const { D, B, P, EEE } = profile;
+  const { D, B, P, Bt, L, C, EEE, beta } = profile;
 
   const diversityGrade = D > 3.2 ? "A-" : D > 2.5 ? "B+" : "C+";
   const emotionalStability = B > 0.6 && P < 0.2 ? "B+" : "B-";
   const socialAdaptation = (1 - P * 0.7).toFixed(2);
   const socialEfficiency = (EEE + (1 - P) * 0.3).toFixed(2);
 
+  const socialMetrics = mapGutToSocial(profile);
+
   return {
     diversityGrade,
     emotionalStability,
     socialAdaptation,
     socialEfficiency,
+    profile,
+    socialMetrics,
+    sni: socialMetrics.sni,
   };
 }
 
 function renderAnalysisResult() {
-  if (!analysisResult) return;
+  if (!analysisResult || !resultListEl) return;
+
+  const gutVisualEl = document.getElementById("gutVisual");
+  const gutImageEl = document.getElementById("gutImage");
+
+  const profile = analysisResult.profile;
+  const sm = analysisResult.socialMetrics;
+  const sni = analysisResult.sni;
+
+  if (gutVisualEl) gutVisualEl.style.display = "block";
+
+  if (gutImageEl && sni != null) {
+    if (sni >= 0.7) {
+      gutImageEl.src = "assets/img/gut-good.png";
+    } else if (sni >= 0.4) {
+      gutImageEl.src = "assets/img/gut-neutral.png";
+    } else {
+      gutImageEl.src = "assets/img/gut-bad.png";
+    }
+  }
+
   resultListEl.style.display = "block";
+
+  const fmt = (x) => (typeof x === "number" ? x.toFixed(2) : x);
+
   resultListEl.innerHTML = `
-    <div>장내 다양성: <strong>${analysisResult.diversityGrade}</strong></div>
-    <div>정서 안정도: <strong>${analysisResult.emotionalStability}</strong></div>
-    <div>사회 적응도: <strong>${analysisResult.socialAdaptation}</strong></div>
-    <div>사회 효율 환산가: <strong>${analysisResult.socialEfficiency}</strong></div>
+    <h3>장내 상태 요약</h3>
+    <p>
+      당신의 장내 생태계는
+      <strong>${
+        analysisResult.diversityGrade
+      }</strong> 수준의 다양성을 가지고 있으며,
+      정서 안정도는 <strong>${
+        analysisResult.emotionalStability
+      }</strong>로 평가되었습니다.
+    </p>
+    <p>
+      사회 적응도 지수는 <strong>${analysisResult.socialAdaptation}</strong>,
+      사회 효율 환산가는 <strong>${
+        analysisResult.socialEfficiency
+      }</strong>입니다.
+    </p>
+
+    <h4>장내 지표</h4>
+    <ul>
+      <li>다양성 지수 (D): <strong>${fmt(profile.D)}</strong></li>
+      <li>유익균 비율 (B): <strong>${fmt(profile.B)}</strong></li>
+      <li>병원성/유해균 비율 (P): <strong>${fmt(profile.P)}</strong></li>
+      <li>Butyrate 생산량 (Bt): <strong>${fmt(profile.Bt)}</strong></li>
+      <li>LPS 수치 (L): <strong>${fmt(profile.L)}</strong></li>
+      <li>Cytokine 점수 (C): <strong>${fmt(profile.C)}</strong></li>
+      <li>대사 효율 (EEE): <strong>${fmt(profile.EEE)}</strong></li>
+    </ul>
+
+    <h4>사회적 정상성 해석</h4>
+    <ul>
+      <li>정상성 허용 범위 (NRS): <strong>${fmt(
+        sm.NRS * 100
+      )}%</strong> — 값이 높을수록 사회가 허용하는 '정상'의 폭이 좁습니다.</li>
+      <li>규범 적합도 (CS): <strong>${fmt(
+        sm.CS * 100
+      )}%</strong> — 사회 규범에 얼마나 잘 맞는지의 지표입니다.</li>
+      <li>공동체 결속 에너지 (CI): <strong>${fmt(sm.CI * 100)}%</strong></li>
+      <li>갈등·혐오 지수 (CFI): <strong>${fmt(sm.CFI * 100)}%</strong></li>
+      <li>생산성 지수 (PS): <strong>${fmt(sm.PS * 100)}%</strong></li>
+      <li>정상성 압력 (NPI): <strong>${fmt(sm.NPI * 100)}%</strong></li>
+      <li>낙인 지수 (SS): <strong>${fmt(sm.SS * 100)}%</strong></li>
+    </ul>
+
+    <p>
+      이 장내 데이터는 현재 사회가 요구하는 '정상성' 기준에 비추어 볼 때,
+      <strong>${
+        sni >= 0.7
+          ? "매우 효율적이고 규범에 잘 맞지만, 다양성과 여유는 부족한 상태"
+          : sni >= 0.4
+          ? "효율성과 다양성 사이에서 균형을 유지하는 상태"
+          : "정상성 기준에서는 벗어나 있지만, 다른 형태의 가능성을 품고 있는 상태"
+      }</strong>
+      로 해석될 수 있습니다.
+    </p>
   `;
 }
 
-// 랜덤 장내 프로필 생성 (앞에서 쓰던 구조 재사용)
+// -----------------------------
+// 랜덤 장내 프로필 생성
+// -----------------------------
 function createRandomGutProfile() {
   return {
     D: 1.5 + Math.random() * 2.5,
@@ -948,14 +1048,12 @@ function createRandomGutProfile() {
   };
 }
 
+// Supabase 상장
 async function listCardToSupabase() {
-  // 1) 장내 프로필 생성
   const profile = createRandomGutProfile();
-  // 2) 분석 결과 생성
   analysisResult = generateAnalysisFromGutProfile(profile);
 
   const label = "G-" + String(2000 + Math.floor(Math.random() * 9000)) + "-A";
-
   const value = parseFloat(analysisResult.socialEfficiency);
 
   const { error } = await db.from("profiles").insert({
@@ -973,28 +1071,11 @@ async function listCardToSupabase() {
   }
 }
 
-function startMorphToText() {
-  const w = standbyCanvas.width;
-  const h = standbyCanvas.height;
-
-  const targets = buildTextTargets("장내자산관리공단");
-
-  // 파티클 수와 타겟 포인트 수 맞춰 매핑
-  particles.forEach((p, i) => {
-    const t = targets[i % targets.length]; // 부족하면 반복해서 재사용
-    p.targetX = t.x + (Math.random() - 0.5) * 8; // 약간 노이즈
-    p.targetY = t.y + (Math.random() - 0.5) * 8;
-    p.morphT = 0;
-    p.mode = "morph";
-  });
-}
-
 // -----------------------------
-// 메인 루프 (1초 단위 업데이트)
+// 메인 루프 (1초 단위)
 // -----------------------------
 function mainLoopTick() {
-  // 센서 예외 처리 (중도 이탈)
-  const USE_PRESSURE_GUARD = false; // 👉 나중에 센서 붙이면 true로 바꿔
+  const USE_PRESSURE_GUARD = false;
 
   if (USE_PRESSURE_GUARD && !pressureOn && currentPhase.startsWith("B")) {
     setPhase("D1");
@@ -1004,9 +1085,8 @@ function mainLoopTick() {
     return;
   }
 
-  // 단계별 시간/정제율 변화
   switch (currentPhase) {
-    case "A1-2": // 캘리브레이션 3~5초
+    case "A1-2":
       scanTimer++;
       if (scanTimer >= 4) {
         scanTimer = 0;
@@ -1043,30 +1123,19 @@ function mainLoopTick() {
       scanTimer++;
       purity = Math.min(98, purity + 1 + Math.random() * 2);
       updateProgress();
-      if (scanTimer >= 25) {
-        // 스캔 완료 → C1
-        setPhase("C1");
-        // C1은 2초 정도만 보여주고 C2로 넘김
-        setTimeout(() => {
-          // 여기에 장내 프로필 & 분석값 한번 생성해두고 C2에서 보여줌
-          const profile = createRandomGutProfile();
-          analysisResult = generateAnalysisFromGutProfile(profile);
-          // 프로필은 따로 저장할 수도 있고,
-          // 상장 YES 할 때 새로 뽑을 수도 있음. 지금은 YES때 새 insert지만,
-          // 필요하면 이곳에서 전역 변수로 유지해도 됨.
-          setPhase("C2");
-        }, 1500);
+
+      if (scanTimer >= scanTotal) {
+        startScanResultTransition();
       }
       break;
 
     default:
-      // 나머지 단계는 별도의 타이머 진행 없음
       break;
   }
 }
 
 // -----------------------------
-// 센서 이벤트 (실제 설치에서는 외부에서 이 함수만 호출해도 됨)
+// 센서 이벤트
 // -----------------------------
 function onPirChange(on) {
   pirOn = on;
@@ -1085,20 +1154,14 @@ function onPressureChange(on) {
   lastPressureChangeTime = Date.now();
 
   if (on) {
-    // 터치/착석 시: 대기 화면 힌트 숨기고 바로 스캔 화면으로
     lastSitTime = Date.now();
+    if (standbyHintEl) standbyHintEl.style.display = "none";
 
-    if (standbyHintEl) {
-      standbyHintEl.style.display = "none";
-    }
-
-    // ✅ 로고 모핑, 지연 전부 빼고 바로 스캔 초기화 단계로 진입
     setPhase("A1-2");
     scanTimer = 0;
     purity = 0;
     updateProgress();
   } else {
-    // 이탈 처리 (그대로 둔다)
     if (currentPhase.startsWith("B") || currentPhase === "A1-2") {
       setPhase("D1");
       scanTimer = 0;
@@ -1111,23 +1174,21 @@ function onPressureChange(on) {
 }
 
 // -----------------------------
-// 버튼/이벤트 바인딩
+// 버튼 바인딩
 // -----------------------------
-
-// 디버그 버튼
 if (debugStartBtn) {
   debugStartBtn.addEventListener("click", () => {
-    // 전체 리셋 후 대기
     pirOn = false;
     pressureOn = false;
     scanTimer = 0;
     purity = 0;
+    microProgress = 0;
+    scanResultStarted = false;
     updateSensorStatus();
     setPhase("A0-1");
   });
 }
 
-// 센서 시뮬레이터 버튼들 (없으면 그냥 무시)
 if (btnPirOn) {
   btnPirOn.addEventListener("click", () => onPirChange(true));
 }
@@ -1146,23 +1207,24 @@ if (btnReset) {
     pressureOn = false;
     scanTimer = 0;
     purity = 0;
+    microProgress = 0;
+    scanResultStarted = false;
     updateSensorStatus();
     setPhase("A0-1");
   });
 }
 
-// YES / NO 버튼 (이건 지금 HTML에 있으니까 그대로 써도 되는데, 통일해서 체크)
 if (btnYes) {
   btnYes.addEventListener("click", async () => {
     setPhase("C3");
-    await listCardToSupabase(); // 여기서 실제 상장 (insert + listed=true)
-    // 약간의 연출 후 A0-1로 리셋
+    await listCardToSupabase();
     setTimeout(() => {
-      // 체험 리셋
       pirOn = false;
       pressureOn = false;
       scanTimer = 0;
       purity = 0;
+      microProgress = 0;
+      scanResultStarted = false;
       updateSensorStatus();
       setPhase("A0-1");
     }, 3000);
@@ -1172,12 +1234,13 @@ if (btnYes) {
 if (btnNo) {
   btnNo.addEventListener("click", () => {
     setPhase("C4");
-    // 잠시 보여주고 초기화
     setTimeout(() => {
       pirOn = false;
       pressureOn = false;
       scanTimer = 0;
       purity = 0;
+      microProgress = 0;
+      scanResultStarted = false;
       updateSensorStatus();
       setPhase("A0-1");
     }, 4000);
@@ -1194,18 +1257,14 @@ updateProgress();
 loopInterval = setInterval(mainLoopTick, 1000);
 
 // -----------------------------
-// 터치로 테스트: Standby 화면을 터치하면
-// 착석(압력센서 ON)과 동일하게 동작
+// 터치 테스트: standby → POSTURE
 // -----------------------------
 let testTriggered = false;
 
 standbyScreenEl.addEventListener("click", () => {
-  // 대기 상태일 때만 작동하게
   if (testTriggered) return;
   if (currentPhase === "A0-1" || currentPhase === "A0-2") {
     testTriggered = true;
-
-    // ✅ 센서 대신, 바로 자세 유도 씬으로 전환
     setPhase("POSTURE");
     scanTimer = 0;
     purity = 0;
@@ -1214,14 +1273,11 @@ standbyScreenEl.addEventListener("click", () => {
 });
 
 // -----------------------------
-// POSTURE 화면을 터치하면 스캔(A1-2)로 넘어가기
+// POSTURE 화면 터치 → A1-2
 // -----------------------------
 if (postureEl) {
   postureEl.addEventListener("click", () => {
     if (currentPhase !== "POSTURE") return;
-
-    // 나중에 압력센서 체크 들어갈 자리.
-    // 지금은 터치하면 곧바로 캘리브레이션 단계로 이동.
     setPhase("A1-2");
     scanTimer = 0;
     purity = 0;

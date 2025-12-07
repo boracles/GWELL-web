@@ -461,6 +461,16 @@ body {
   margin-bottom: 2px;
 }
 
+.scan-fade-out {
+  transition: opacity 0.6s ease;
+  opacity: 0;
+}
+
+.scan-fade-in {
+  transition: opacity 0.6s ease;
+  opacity: 1;
+}
+
 /* 센서 시뮬레이터는 기본 숨김 */
 .sensor-sim {
   margin-top: 8px;
@@ -791,10 +801,10 @@ body {
 /* 뉴스 밑 상단 블록: ID + 시세 + 파라미터 */
 .market-top-row {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   align-items: flex-start;
   padding: 4px 0 8px;
-  margin-bottom: 14px;
+  margin-bottom: 0px;
 }
 
 .market-top-left .mt-id {
@@ -1427,7 +1437,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 10px 18px 16px;
-  gap: 2px;
+  gap: 8px;
 }
 
 .ticker-row {
@@ -1585,39 +1595,41 @@ body {
   flex: 0 0 auto; /* ✅ 더 이상 세로로 늘어나지 않게 */
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
   margin-top: 0;
-  margin-bottom: 0;
+  margin-bottom: 0px;
 }
 
 .chart-main {
-  background: #020617;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 6px 6px 8px;
-  height: 340px;
+  background: #140823;
+  border-radius: 0px;
+  opacity: 0.6;
+  border: none;
+  padding: 0px 0px 10px;
+  height: 320px;
 }
 
 .chart-main canvas {
+  display: block;
   width: 100% !important;
   height: 100% !important;
 }
 
 /* 아래 인디케이터 */
 .chart-indicator {
-  background: #020617;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 4px 6px 6px;
+  background: #140823;
+  opacity: 0.6;
+  border: none;
+  padding: 8px 10px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  height: 90px; /* ✅ 확실히 보이는 높이 */
+  gap: 4px;
+  height: 90px;
 }
 
 .indicator-label {
-  font-size: 10px;
-  opacity: 0.7;
+  font-size: 11px;
+  opacity: 0.75;
 }
 
 .chart-indicator canvas {
@@ -1647,7 +1659,7 @@ section {
   flex: 1; /* ✅ 남는 세로공간을 이쪽이 먹게 */
   display: flex;
   flex-direction: column;
-  margin-top: 0;
+  margin-top: 4px;
   background: #020617;
   border-radius: 10px;
   border: none;
