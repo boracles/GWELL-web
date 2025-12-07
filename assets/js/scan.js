@@ -538,7 +538,10 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.7;
-      showMicrobes(false);
+
+      // 스캔 시작하자마자 미생물 등장
+      microProgress = 0.25; // 처음엔 살짝만 보이게
+      showMicrobes(true);
       break;
 
     case "B1": // 안정화
@@ -675,6 +678,8 @@ let microIsActive = false;
 let microStartTime = 0;
 let microLoaded = false;
 
+let microProgress = 0;
+
 // ❗ 실제 파일 이름에 맞게 수정해줘
 const MICRO_MODEL_PATHS = [
   "assets/models/Microbiome_1.glb",
@@ -795,18 +800,27 @@ function animateMicrobes() {
   const now = performance.now();
   const t = (now - microStartTime) * 0.001;
 
-  // 🔹 스캔 진행도(0~1): B1~B3, C1 구간에서만 증가
-  let scanProgress = 0;
-  if (currentPhase === "B1" || currentPhase === "B2" || currentPhase === "B3") {
-    scanProgress = Math.min(1, scanTimer / scanTotal);
-  } else if (currentPhase === "C1") {
-    scanProgress = 1;
+  // 🔹 현재 단계에 따른 “목표 진행도” (0~1) – 계단식으로만 변함
+  let targetProgress = 0;
+  if (currentPhase === "A1-2") {
+    targetProgress = 0.25; // 캘리브레이션 시작: 중앙에 몇 개만
+  } else if (currentPhase === "B1") {
+    targetProgress = 0.45; // 안정화 구간
+  } else if (currentPhase === "B2") {
+    targetProgress = 0.75; // 힘 주는 구간: 꽤 많이
+  } else if (currentPhase === "B3" || currentPhase === "C1") {
+    targetProgress = 1.0; // 스캔 막바지: 꽉 찬 느낌
+  } else {
+    targetProgress = 0; // 나머지 단계에서는 서서히 꺼질 준비
   }
+
+  // 🔹 microProgress를 프레임마다 서서히 target으로 수렴시키기 → 스무스
+  microProgress += (targetProgress - microProgress) * 0.05; // 0.05 정도면 부드럽게
 
   // 🔹 카메라 줌 인: 진행될수록 점점 가까이
   const camStartZ = 55;
   const camEndZ = 28; // 최종엔 꽤 크게 보이게
-  const camZ = camStartZ - (camStartZ - camEndZ) * scanProgress;
+  const camZ = camStartZ - (camStartZ - camEndZ) * microProgress;
   microCamera.position.z = camZ;
   microCamera.lookAt(0, 0, 0);
   microCamera.updateProjectionMatrix();
@@ -818,28 +832,25 @@ function animateMicrobes() {
   microGroup.children.forEach((wrapper) => {
     const d = wrapper.userData;
 
-    // 🔹 이 개체가 언제부터 등장할지: spawnOffset 기준으로 순차 등장
-    // scanProgress (0~1)에 따라 등장 여부/강도 결정
-    let appear = (scanProgress * 1.2 - d.spawnOffset) / 0.5; // 대략 앞/뒤로 여유
+    // 🔹 개체별 등장 타이밍: spawnOffset 기준으로 순차 등장
+    let appear = (microProgress * 1.2 - d.spawnOffset) / 0.5;
     if (appear < 0) appear = 0;
     if (appear > 1) appear = 1;
 
-    // 등장 전에는 거의 0으로 축소시켜버림
     if (appear <= 0) {
       wrapper.visible = false;
       return;
     }
     wrapper.visible = true;
 
-    // 🔹 반지름: 처음엔 거의 중앙 → 나중에 d.baseRadius 까지 퍼짐
+    // 🔹 반지름: 처음엔 중앙 → 진행될수록 자신의 baseRadius까지 퍼짐
     const r = d.baseRadius * (0.2 + 0.8 * appear);
 
-    // 🔹 미생물 "헤엄" 느낌: 큰 궤도 말고, 제자리 근처에서 꿈틀
+    // 🔹 미생물 "헤엄" 느낌: 작은 범위에서 꿈틀거리기
     const swimPhase = t * 0.9 + d.offset;
     const wobbleSmall = Math.sin(swimPhase * 1.3) * 0.4;
     const wobbleSmall2 = Math.cos(swimPhase * 1.1) * 0.4;
 
-    // 기본 각도로 둥글게 배치 + 살짝씩 회전하는 느낌
     const angle =
       d.baseAngle + Math.sin(t * 0.25 + d.offset * 0.2) * 0.4 * d.swirlDir;
 
@@ -852,12 +863,12 @@ function animateMicrobes() {
 
     wrapper.position.set(x, y, z);
 
-    // 🔹 회전: 자기 몸을 살짝 비틀면서 헤엄치는 느낌
+    // 🔹 회전: 살짝 비틀거리면서 헤엄치는 느낌
     wrapper.rotation.x += 0.015 * d.swirlDir;
     wrapper.rotation.y += 0.02;
     wrapper.rotation.z += Math.sin(t * 0.8 + d.offset) * 0.004;
 
-    // 🔹 스케일: 등장하면서 커지고, 호흡하듯이 약간씩 변함
+    // 🔹 스케일: 등장하면서 커지고, 숨 쉬듯이 살짝씩 변함
     const breath = 1 + Math.sin(t * 1.6 + d.offset) * 0.15;
     const s = d.baseScale * (0.4 + 0.8 * appear) * breath;
     wrapper.scale.set(s, s, s);
