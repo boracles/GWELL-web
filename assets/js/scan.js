@@ -711,7 +711,6 @@ function initMicrobeScene() {
   microGroup = new THREE.Group();
   microScene.add(microGroup);
 
-  // 🔹 HTML에서 window.GLTFLoader로 노출해놨으니까 이걸 사용
   const loader = new window.GLTFLoader();
 
   const loadPromises = MICRO_MODEL_PATHS.map(

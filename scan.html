@@ -19,18 +19,27 @@
 
     <link rel="stylesheet" href="assets/css/style.css" />
 
+    <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
+    <script src="assets/js/supabase-init.js"></script>
+    <!-- three.js import map -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        }
+      }
+    </script>
+
     <script type="module">
-      import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+      import * as THREE from "three";
       import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
+      // 전역에서 쓸 수 있게 window에만 붙이기 (네임스페이스는 건드리지 않기)
       window.THREE = THREE;
       window.GLTFLoader = GLTFLoader;
     </script>
 
-    <!-- Supabase -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
-    <script src="assets/js/supabase-init.js"></script>
-
+    <!-- 그 다음에 scan.js (예전 그대로) -->
     <script src="assets/js/scan.js" defer></script>
 
     <style>

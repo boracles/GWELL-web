@@ -43,71 +43,76 @@
 
         <main class="market-main">
           <!-- 상단 티커 + 우측 수치/파라미터 -->
-          <section class="ticker-row">
-            <!-- 좌: ID + 가격 -->
-            <div class="ticker-main">
-              <div class="ticker-id" id="tickerId">ID GA-01</div>
-
-              <div class="ticker-price-row">
-                <span class="ticker-price" id="tickerPrice">0.00</span>
-                <span class="ticker-delta" id="tickerDelta">+0.00</span>
-                <span class="ticker-rate" id="tickerRate">+0.00%</span>
+          <section class="market-top-row">
+            <!-- 좌: 방금 스캔된 ID + 현재가 -->
+            <div class="market-top-left">
+              <div class="mt-id-line">
+                <span class="mt-id-label">ID</span>
+                <span class="mt-id" id="tickerId">GA-01</span>
               </div>
 
-              <!-- 간단 설명 -->
-              <div class="ticker-sub" id="tickerSub">
-                장내 데이터 기반 실시간 상장 상태.
+              <div class="mt-price-main">
+                <span class="mt-price" id="tickerPrice">0.00</span>
+                <span class="mt-delta" id="tickerDelta">+0.00</span>
               </div>
 
-              <!-- 장내 미생물 파라미터 + 사회 환산가치 문장 -->
-              <div class="ticker-meta" id="tickerMeta">
+              <div class="mt-rate-line">
+                <span class="mt-rate" id="tickerRate">+0.00%</span>
+                <span class="mt-sub" id="tickerSub"
+                  >장내 자산 실시간 상장 상태.</span
+                >
+              </div>
+
+              <div class="mt-meta" id="tickerMeta">
                 정제율 0% · 사회 효율 환산가 0.00 · 사회 기여도 - · 거래 등급
                 Lv0
               </div>
             </div>
 
-            <!-- 중간: 기본 시세 정보 -->
-            <div class="ticker-stats">
-              <div class="ticker-stat">
-                <span class="label">Open</span>
-                <span class="value" id="statOpen">-</span>
+            <!-- 우: 기본 시세 + 장내 파라미터 -->
+            <div class="market-top-right">
+              <!-- 왼쪽 컬럼: 시세 정보 -->
+              <div class="mt-stat-col">
+                <div class="mt-stat-row">
+                  <span class="label">Open</span>
+                  <span class="value" id="statOpen">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">High</span>
+                  <span class="value" id="statHigh">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">Low</span>
+                  <span class="value" id="statLow">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">52 w high</span>
+                  <span class="value" id="stat52High">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">52 w low</span>
+                  <span class="value" id="stat52Low">-</span>
+                </div>
               </div>
-              <div class="ticker-stat">
-                <span class="label">High</span>
-                <span class="value" id="statHigh">-</span>
-              </div>
-              <div class="ticker-stat">
-                <span class="label">Low</span>
-                <span class="value" id="statLow">-</span>
-              </div>
-              <div class="ticker-stat">
-                <span class="label">52w High</span>
-                <span class="value" id="stat52High">-</span>
-              </div>
-              <div class="ticker-stat">
-                <span class="label">52w Low</span>
-                <span class="value" id="stat52Low">-</span>
-              </div>
-            </div>
 
-            <!-- 우: 스캔 파라미터 카드 -->
-            <div class="ticker-params">
-              <div class="params-title">ID 스캔 파라미터</div>
-              <div class="param-row">
-                <span class="label">정제율</span>
-                <span class="value" id="metricPurity">0%</span>
-              </div>
-              <div class="param-row">
-                <span class="label">사회 효율 환산가</span>
-                <span class="value" id="metricEfficiency">0.00</span>
-              </div>
-              <div class="param-row">
-                <span class="label">사회 기여도</span>
-                <span class="value" id="metricContribution">-</span>
-              </div>
-              <div class="param-row">
-                <span class="label">거래 등급</span>
-                <span class="value" id="metricLevel">Lv0</span>
+              <!-- 오른쪽 컬럼: 장내 스캔 파라미터 -->
+              <div class="mt-stat-col">
+                <div class="mt-stat-row">
+                  <span class="label">정제율</span>
+                  <span class="value" id="metricPurity">0%</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">사회 효율 환산가</span>
+                  <span class="value" id="metricEfficiency">0.00</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">사회 기여도</span>
+                  <span class="value" id="metricContribution">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">거래 등급</span>
+                  <span class="value" id="metricLevel">Lv0</span>
+                </div>
               </div>
             </div>
           </section>
