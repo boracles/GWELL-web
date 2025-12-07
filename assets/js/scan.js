@@ -39,6 +39,10 @@ const scanSequenceEl = document.getElementById("scanSequence");
 const scanSequenceTextEl = document.getElementById("scanSequenceText");
 const scanStepEls = document.querySelectorAll(".scan-step[data-scan-step]");
 
+const scanSequenceProgressInnerEl = document.getElementById(
+  "scanSequenceProgressInner"
+);
+
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
@@ -256,127 +260,52 @@ const scanStepTexts = [
   "측정값을 사회적 정상성·효율성 지표로 환산하는 중입니다.",
 ];
 
+const SCAN_STEP_COUNT = scanStepTexts.length;
 let currentScanStep = -1;
 
-let scanCurrentRatio = 0; // 0~1 (로딩바 전체 비율)
-let scanStepIndex = -1; // 현재 단계 index
-let scanProgressInterval = null; // setInterval 핸들
+// 🔹 stepIdx: 0~3, -1이면 숨김
+function updateScanStepUI(stepIdx) {
+  if (!scanSequenceEl) return;
 
-function clearScanProgressInterval() {
-  if (scanProgressInterval) {
-    clearInterval(scanProgressInterval);
-    scanProgressInterval = null;
-  }
-}
-
-// 스캔 단계 UI 전체 리셋
-function resetScanProgressUI() {
-  clearScanProgressInterval();
-  scanCurrentRatio = 0;
-  scanStepIndex = -1;
-
-  if (progressBarInnerEl) {
-    progressBarInnerEl.style.width = "0%";
-  }
-  if (progressTimeEl) {
-    progressTimeEl.textContent = "";
-  }
-  if (remainingTimeEl) {
-    remainingTimeEl.textContent = "";
-  }
-  if (statusTimerEl) {
-    statusTimerEl.textContent = "";
-  }
-  if (scanSequenceTextEl) {
-    scanSequenceTextEl.textContent = "";
+  if (stepIdx < 0) {
+    // 스캔 안 할 때 → 숨기기 + 초기화
+    scanSequenceEl.style.display = "none";
+    if (scanSequenceTextEl) scanSequenceTextEl.textContent = "";
+    scanStepEls.forEach((el) => {
+      el.classList.remove("completed");
+      const check = el.querySelector(".scan-step-check");
+      if (check) check.style.opacity = "0";
+    });
+    return;
   }
 
-  scanStepEls.forEach((el) => {
-    el.classList.remove("completed");
-    const check = el.querySelector(".scan-step-check");
-    if (check) check.style.opacity = "0";
-  });
-}
+  const idx = Math.max(0, Math.min(SCAN_STEP_COUNT - 1, stepIdx));
 
-// 👉 좌석 안내 progress처럼, 특정 단계까지 "한 번" 채우는 함수
-function goToScanStep(stepIndex) {
-  if (!scanSequenceEl || !scanStepEls.length) return;
-
-  // 하단 단계 UI 보이기
   scanSequenceEl.style.display = "block";
 
-  // 현재 단계 문장
+  // 문장
   if (scanSequenceTextEl) {
-    scanSequenceTextEl.textContent = scanStepTexts[stepIndex];
+    scanSequenceTextEl.textContent = scanStepTexts[idx];
   }
 
-  clearScanProgressInterval();
+  // 체크 (해당 구간까지 완료된 칸만)
+  scanStepEls.forEach((el, i) => {
+    const check = el.querySelector(".scan-step-check");
+    const completed = i <= idx;
+    el.classList.toggle("completed", completed);
+    if (check) check.style.opacity = completed ? "1" : "0";
+  });
 
-  const stepCount = scanStepTexts.length;
-  const targetRatio = (stepIndex + 1) / stepCount; // 0.25, 0.5, 0.75, 1.0
-
-  const duration = 1100; // 좌석 안내랑 맞춘 1.1초
-  const interval = 50;
-  const steps = Math.floor(duration / interval);
-  const start = scanCurrentRatio;
-  const delta = (targetRatio - start) / steps;
-
-  let count = 0;
-  scanProgressInterval = setInterval(() => {
-    count++;
-    scanCurrentRatio = start + delta * count;
-    if (scanCurrentRatio < 0) scanCurrentRatio = 0;
-    if (scanCurrentRatio > 1) scanCurrentRatio = 1;
-
-    // 🔹 로딩바 채우기
-    const width = scanCurrentRatio * 100;
-    if (progressBarInnerEl) {
-      progressBarInnerEl.style.width = `${width}%`;
-    }
-
-    // 🔹 시간/남은 시간은 대략 비율 기준으로 계산
-    const elapsed = Math.round(scanCurrentRatio * SCAN_OVERALL_TOTAL);
-    const total = SCAN_OVERALL_TOTAL;
-    if (progressTimeEl) {
-      progressTimeEl.textContent = `${formatTime(elapsed)} / ${formatTime(
-        total
-      )}`;
-    }
-    if (remainingTimeEl) {
-      const remaining = Math.max(0, total - elapsed);
-      remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
-    }
-    if (statusTimerEl) {
-      statusTimerEl.textContent = formatTime(elapsed);
-    }
-
-    // 애니메이션 끝
-    if (count >= steps) {
-      clearScanProgressInterval();
-      scanProgressInterval = null;
-
-      // 🔹 이 단계까지 완료 → 체크 업데이트
-      scanStepEls.forEach((el, idx) => {
-        const check = el.querySelector(".scan-step-check");
-        const completed = idx <= stepIndex; // 이 index까지 ✔
-        el.classList.toggle("completed", completed);
-        if (check) check.style.opacity = completed ? "1" : "0";
-      });
-
-      scanStepIndex = stepIndex;
-    }
-  }, interval);
-}
-
-function updateScanSequence(ratio) {
-  // 더 이상 사용 안 함 (로딩바/체크는 goToScanStep에서 처리)
+  currentScanStep = idx;
 }
 
 // -----------------------------
 // Phase 전환
 // -----------------------------
 function setPhase(phase) {
+  if (currentPhase === phase) return;
   currentPhase = phase;
+
   if (statusPhaseEl) statusPhaseEl.textContent = phase;
   if (warningMessageEl) warningMessageEl.style.display = "none";
   if (resultListEl) resultListEl.style.display = "none";
@@ -433,7 +362,9 @@ function setPhase(phase) {
       purity = 0;
       updateProgress();
       showMicrobes(false);
-      resetScanProgressUI();
+
+      resetScanSteps();
+
       break;
 
     case "A0-2":
@@ -658,7 +589,7 @@ function setPhase(phase) {
 
       microProgress = 0.25;
       showMicrobes(true);
-      goToScanStep(0);
+
       break;
 
     case "B1":
@@ -670,7 +601,6 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.6;
       showMicrobes(true);
 
-      goToScanStep(1);
       break;
 
     case "B2":
@@ -682,7 +612,6 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.65;
       showMicrobes(true);
 
-      goToScanStep(2);
       break;
 
     case "B3":
@@ -694,7 +623,6 @@ function setPhase(phase) {
       scanBgEl.style.opacity = 0.6;
       showMicrobes(true);
 
-      goToScanStep(3);
       break;
 
     case "C1":
@@ -777,7 +705,64 @@ function updateSensorStatus() {
 // 진행바 업데이트 + 스캔 단계 연동
 // -----------------------------
 function updateProgress() {
-  purityValueEl.textContent = `${Math.round(purity)}%`;
+  // 정제율 텍스트
+  if (purityValueEl) {
+    purityValueEl.textContent = `${Math.round(purity)}%`;
+  }
+
+  const isScanPhase =
+    currentPhase === "A1-2" ||
+    currentPhase === "B1" ||
+    currentPhase === "B2" ||
+    currentPhase === "B3" ||
+    currentPhase === "C1";
+
+  if (
+    !progressBarInnerEl ||
+    !progressTimeEl ||
+    !remainingTimeEl ||
+    !statusTimerEl
+  ) {
+    return;
+  }
+
+  if (isScanPhase) {
+    // 🔹 전체 스캔 진행도 (0~1)
+    const ratio = Math.min(
+      1,
+      Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
+    );
+
+    // 로딩바 폭
+    progressBarInnerEl.style.width = `${ratio * 100}%`;
+
+    // 시간 텍스트
+    const elapsed = scanOverallTimer; // 실제 흐른 초
+    const total = SCAN_OVERALL_TOTAL;
+
+    progressTimeEl.textContent = `${formatTime(elapsed)} / ${formatTime(
+      total
+    )}`;
+    const remaining = Math.max(0, total - elapsed);
+    remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
+    statusTimerEl.textContent = formatTime(elapsed);
+
+    // 🔹 구간 → step index (0~3)
+    const stepIdx = Math.min(
+      SCAN_STEP_COUNT - 1,
+      Math.floor(ratio * SCAN_STEP_COUNT)
+    );
+
+    if (stepIdx !== currentScanStep) {
+      // 경계(1/4, 2/4, 3/4, 4/4)를 막 넘어간 순간에만 체크/문장 갱신
+      updateScanStepUI(stepIdx);
+    }
+  } else {
+    // 스캔 안 할 때: 단계 UI 숨김
+    updateScanStepUI(-1);
+    // 바는 유지하고 싶으면 이 줄은 주석 처리
+    // progressBarInnerEl.style.width = "0%";
+  }
 }
 
 // -----------------------------
@@ -1105,209 +1090,294 @@ function generateAnalysisFromGutProfile(profile) {
   };
 }
 
+// 🔹 이 함수만 교체
 function renderAnalysisResult() {
   if (!analysisResult || !resultListEl) return;
 
-  const gutVisualEl = document.getElementById("gutVisual");
-  const gutImageEl = document.getElementById("gutImage");
-
   const profile = analysisResult.profile;
   const sm = analysisResult.socialMetrics || {};
-  const sni = analysisResult.sni ?? 0.5;
+  const sniRaw = analysisResult.sni ?? 0.5;
 
-  // ---- 전체 점수 / 퍼센트 ----
-  const overallScore = Math.max(0, Math.min(1, sni));
+  // === 전체 점수 / 등급 계산 ===
+  const overallScore = Math.max(0, Math.min(1, sniRaw));
   const overallScoreText = overallScore.toFixed(2);
-  const overallPercentText = Math.round(overallScore * 100);
 
-  // 점수 → 등급 (A~D)
-  const gradeFromScore = (score, invert = false) => {
-    let v = Math.max(0, Math.min(1, score));
-    if (invert) v = 1 - v; // 높을수록 나쁜 지표(CFI 등)는 뒤집어서 등급 계산
-    if (v >= 0.8) return "A";
-    if (v >= 0.6) return "B";
-    if (v >= 0.4) return "C";
-    return "D";
+  // A/B/C 등급
+  let overallGrade;
+  if (overallScore >= 0.7) overallGrade = "A";
+  else if (overallScore >= 0.4) overallGrade = "B";
+  else overallGrade = "C";
+
+  // 등급별 색상 (주식창처럼)
+  const gradeColorMap = {
+    A: "#22c55e", // 초록
+    B: "#eab308", // 노랑
+    C: "#ef4444", // 빨강
   };
+  const gradeColor = gradeColorMap[overallGrade];
 
+  // 등급별 한줄 상태 문장
+  let actionLine;
+  if (overallGrade === "A") {
+    actionLine =
+      "공단은 현재 장내 생태를 사회 순환 구조 유지에 적극 활용할 것을 권고합니다.";
+  } else if (overallGrade === "B") {
+    actionLine =
+      "공단은 추가 개입 없이 경과 관찰을 권고합니다. 필요 시 부분적인 조정이 요구될 수 있습니다.";
+  } else {
+    actionLine = "공단은 사회 순환 효율 복원을 위한 조치 이행을 권고합니다.";
+  }
+
+  // === 5개 범주 점수 ===
   const pct = (x) => `${Math.round(x * 100)}%`;
 
-  // 각 카테고리용 값
-  const diversityScore = 1 - (sm.NRS ?? 0.5); // NRS 높음 = 정상 범위 좁음 → 뒤집어서 "다양성" 점수
+  const diversityScore = 1 - (sm.NRS ?? 0.5); // 정상성 폭 (넓을수록 좋음)
   const conformityScore = sm.CS ?? 0.5;
   const cohesionScore = sm.CI ?? 0.5;
   const conflictScore = sm.CFI ?? 0.5; // 높을수록 갈등↑
   const productivityScore = sm.PS ?? 0.5;
 
+  const gradeFromScore = (score, invert = false) => {
+    let v = Math.max(0, Math.min(1, score));
+    if (invert) v = 1 - v;
+    if (v >= 0.7) return "A";
+    if (v >= 0.4) return "B";
+    return "C";
+  };
+
   const diversityGrade = gradeFromScore(diversityScore);
   const conformityGrade = gradeFromScore(conformityScore);
   const cohesionGrade = gradeFromScore(cohesionScore);
-  const conflictGrade = gradeFromScore(conflictScore, true); // 갈등은 낮을수록 좋음
+  const conflictGrade = gradeFromScore(conflictScore, true);
   const productivityGrade = gradeFromScore(productivityScore);
 
-  // 설명 문구 간단 로직
+  // 간단 설명들
   const diversityText =
     diversityScore >= 0.7
-      ? "다양한 미생물이 공존하고 있습니다. 사회적으로는 여러 정체성이 공존하는 포용적 상태에 가깝습니다."
+      ? "다양한 미생물이 공존하고 있습니다. 여러 정체성이 공존하는 포용적 사회에 가깝습니다."
       : diversityScore >= 0.4
-      ? "다양성은 유지되고 있으나 일부 종이 과도하게 우세해지고 있습니다. 사회적으로는 특정 정상성이 강하게 작동하는 상태입니다."
-      : "장내 다양성이 낮아 획일화된 생태계에 가깝습니다. 사회적으로는 한 가지 기준만 강요되는 비포용적 상태로 읽힙니다.";
+      ? "다양성은 유지되지만 일부 종이 과도하게 우세합니다. 특정 정상성이 강하게 작동하는 상태입니다."
+      : "장내 다양성이 낮아 획일화된 생태계에 가깝습니다. 한 가지 기준만 강요되는 상태로 읽힙니다.";
 
   const conformityText =
     conformityScore >= 0.7
       ? "유익균 비율이 높고 병원성 미생물은 낮은 편입니다. 규범을 잘 따르는 순응형 시민에 가까운 프로파일입니다."
       : conformityScore >= 0.4
-      ? "유익균과 잠재적 병원균이 섞여 있습니다. 사회 규범에 대체로 맞지만 때때로 경계 대상이 되는 존재로 읽힙니다."
-      : "병원성·잠재적 유해균의 비율이 높습니다. 사회가 쉽게 '문제적'으로 낙인찍을 수 있는 몸의 상태로 해석됩니다.";
+      ? "유익균과 잠재적 병원균이 섞여 있습니다. 대체로 규범에 맞지만 때때로 경계 대상이 되는 존재입니다."
+      : "병원성·잠재적 유해균 비율이 높습니다. 사회가 쉽게 '문제적'으로 낙인찍을 수 있는 몸의 상태입니다.";
 
   const cohesionText =
     cohesionScore >= 0.7
-      ? "SCFA(특히 Butyrate) 생산이 활발해 공동체 결속 에너지가 높은 상태입니다. 서로를 지탱하는 힘이 충분합니다."
+      ? "SCFA(특히 Butyrate) 생산이 활발해 공동체 결속 에너지가 높은 상태입니다."
       : cohesionScore >= 0.4
-      ? "기초 에너지는 유지되지만 결속력이 흔들릴 수 있는 수준입니다. 사회적으로는 관계망이 느슨해지는 과도기입니다."
-      : "SCFA 생산이 떨어져 에너지 부족 상태에 가깝습니다. 사회적으로는 서로를 지탱할 힘이 부족한, 해체 직전의 공동체에 비유할 수 있습니다.";
+      ? "기초 에너지는 유지되지만 결속력이 흔들릴 수 있는 수준입니다."
+      : "SCFA 생산이 떨어져 서로를 지탱할 힘이 부족한 상태에 가깝습니다.";
 
   const conflictText =
     conflictScore >= 0.7
-      ? "LPS와 염증성 사이토카인이 높아 만성 염증 상태에 가깝습니다. 사회적으로는 혐오·갈등이 일상화된 고강도 분열 상태입니다."
+      ? "LPS와 염증성 사이토카인이 높아 만성 염증 상태입니다. 혐오·갈등이 일상화된 분열 상태로 볼 수 있습니다."
       : conflictScore >= 0.4
-      ? "염증 지표가 다소 상승한 상태입니다. 사회적으로는 갈등 이슈가 반복적으로 나타나며 긴장이 계속 유지되는 국면입니다."
-      : "염증 지표가 낮아 비교적 안정적인 상태입니다. 사회적으로는 갈등이 국소적으로 발생하더라도 빠르게 봉합되는 편입니다.";
+      ? "염증 지표가 다소 상승한 상태입니다. 갈등 이슈가 반복적으로 나타나는 국면입니다."
+      : "염증 지표가 낮아 비교적 안정적인 상태입니다. 갈등이 생겨도 빠르게 봉합되는 편입니다.";
 
   const productivityText =
     productivityScore >= 0.7
-      ? "장 내 대사 효율이 높아 에너지를 잉여까지 확보하는 상태입니다. 사회적으로는 고효율·고생산성을 강하게 요구받는 위치에 있습니다."
+      ? "대사 효율이 높아 에너지를 잉여까지 확보하는 상태입니다. 고효율·고생산성을 강하게 요구받는 위치로 읽힙니다."
       : productivityScore >= 0.4
-      ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 사회적으로는 평균적인 생산성을 가진 시민으로 평가됩니다."
-      : "대사 효율이 낮아 에너지 확보가 버겁습니다. 사회적으로는 '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
+      ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민에 가깝습니다."
+      : "대사 효율이 낮아 에너지 확보가 버겁습니다. '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
 
-  // 장 그림
-  if (gutVisualEl) gutVisualEl.style.display = "block";
-  if (gutImageEl) {
-    if (overallScore >= 0.7) {
-      gutImageEl.src = "assets/img/gut-good.png";
-    } else if (overallScore >= 0.4) {
-      gutImageEl.src = "assets/img/gut-neutral.png";
-    } else {
-      gutImageEl.src = "assets/img/gut-bad.png";
-    }
+  // === 헤더 텍스트(중앙 메인 문구도 여기서 맞춰줌) ===
+  if (mainMessageEl) {
+    mainMessageEl.textContent = `귀하의 장내 생태는 사회 적응도 ${overallScoreText}로 판정되었습니다.`;
+  }
+  if (subMessageEl) {
+    subMessageEl.textContent = actionLine;
   }
 
-  // 실제 DOM 출력
+  // === 오른쪽 결과 패널(장 이미지는 이미 왼쪽 캔버스에 따로 있음) ===
   resultListEl.style.display = "block";
   resultListEl.innerHTML = `
-    <div class="gut-report">
-      <!-- 좌측: 전체 점수 + 장내 이미지 -->
-      <section class="gut-report-main">
-        <div class="gut-report-overall">
-          <div class="gut-report-overall-label">사회 적응도</div>
-          <div class="gut-report-overall-score">${overallScoreText}</div>
-          <p class="gut-report-overall-sub">
-            귀하의 장내 생태는 <strong>사회 적응도 ${overallScoreText}</strong>로 환산되었습니다.
-          </p>
-          <p class="gut-report-overall-desc">
-            이 점수는 장내 다양성, 규범 적합도, 공동체 결속, 갈등·염증 지표, 대사 효율을 통합하여 계산한
-            <strong>사회 정상성 지수</strong>입니다. 점수가 높을수록 현재 사회가 요구하는 기준에 잘 맞는
-            몸의 상태로 평가되며, 낮을수록 다른 형태의 가능성을 품은 상태로 읽을 수 있습니다.
-          </p>
-        </div>
-
-        <div class="gut-report-visual">
-          <div class="gut-report-gut-image">
-            ${gutImageEl ? gutImageEl.outerHTML : ""}
+    <div class="gut-layout-right-inner" style="display:flex; flex-direction:column; gap:16px;">
+      <!-- 한눈에 보는 결과 헤더 -->
+      <div style="
+        border-radius:16px;
+        padding:16px 18px;
+        background:rgba(248,250,252,0.95);
+        box-shadow:0 8px 20px rgba(15,23,42,0.06);
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+      ">
+        <div>
+          <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">
+            귀하의 장내 생태는
           </div>
-          <div class="gut-report-gut-caption">
-            장내 생태를 사회 인프라로 번역한 시각화입니다.
+          <div style="font-size:16px; font-weight:600; color:#111827; line-height:1.4;">
+            사회 적응도 <span style="color:${gradeColor};">${overallScoreText}</span>로 판정되었습니다.<br/>
+            <span style="font-size:13px; color:#4b5563;">${actionLine}</span>
           </div>
         </div>
-      </section>
+        <div style="
+          min-width:72px;
+          text-align:center;
+          padding:8px 10px;
+          border-radius:14px;
+          background:${gradeColor}1A;
+          border:1px solid ${gradeColor};
+        ">
+          <div style="font-size:11px; color:#4b5563; margin-bottom:2px;">등급</div>
+          <div style="font-size:22px; font-weight:700; color:${gradeColor};">
+            ${overallGrade}
+          </div>
+        </div>
+      </div>
 
-      <!-- 우측: 다섯 가지 범주 카드 -->
-      <section class="gut-report-cards">
-        <article class="gut-card gut-card--diversity">
-          <header class="gut-card-header">
-            <h3 class="gut-card-title">장내 다양성 &amp; 정상성의 폭</h3>
-            <div class="gut-card-grade">
-              <span class="gut-card-grade-letter">${diversityGrade}</span>
-              <span class="gut-card-grade-score">${pct(diversityScore)}</span>
-            </div>
-          </header>
-          <p class="gut-card-metric">
-            Shannon 다양성 지수 D: <strong>${profile.D.toFixed(2)}</strong>
-          </p>
-          <p class="gut-card-text">
+      <!-- 세부 범주 5개 -->
+      <div style="
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:14px;
+      ">
+        <div style="
+          background:#ffffff;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:600; color:#111827;">
+              장내 다양성 & 정상성의 폭
+            </span>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${diversityGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+            D = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
             ${diversityText}
           </p>
-        </article>
+        </div>
 
-        <article class="gut-card gut-card--conformity">
-          <header class="gut-card-header">
-            <h3 class="gut-card-title">규범 적합도 (순응 점수)</h3>
-            <div class="gut-card-grade">
-              <span class="gut-card-grade-letter">${conformityGrade}</span>
-              <span class="gut-card-grade-score">${pct(conformityScore)}</span>
-            </div>
-          </header>
-          <p class="gut-card-metric">
-            유익균 비율 B: <strong>${profile.B.toFixed(2)}</strong>,
-            병원성 비율 P: <strong>${profile.P.toFixed(2)}</strong>
-          </p>
-          <p class="gut-card-text">
+        <div style="
+          background:#ffffff;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:600; color:#111827;">
+              규범 적합도 (순응 점수)
+            </span>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${conformityGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+            B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
+    conformityScore
+  )}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
             ${conformityText}
           </p>
-        </article>
+        </div>
 
-        <article class="gut-card gut-card--cohesion">
-          <header class="gut-card-header">
-            <h3 class="gut-card-title">공동체 결속 에너지 (SCFA)</h3>
-            <div class="gut-card-grade">
-              <span class="gut-card-grade-letter">${cohesionGrade}</span>
-              <span class="gut-card-grade-score">${pct(cohesionScore)}</span>
-            </div>
-          </header>
-          <p class="gut-card-metric">
-            Butyrate 생산량 Bt: <strong>${profile.Bt.toFixed(1)}</strong>
-          </p>
-          <p class="gut-card-text">
+        <div style="
+          background:#ffffff;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:600; color:#111827;">
+              공동체 결속 에너지 (SCFA)
+            </span>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${cohesionGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+            Bt = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
             ${cohesionText}
           </p>
-        </article>
+        </div>
 
-        <article class="gut-card gut-card--conflict">
-          <header class="gut-card-header">
-            <h3 class="gut-card-title">갈등·혐오 지수 (염증 로드)</h3>
-            <div class="gut-card-grade">
-              <span class="gut-card-grade-letter">${conflictGrade}</span>
-              <span class="gut-card-grade-score">${pct(conflictScore)}</span>
-            </div>
-          </header>
-          <p class="gut-card-metric">
-            LPS L: <strong>${profile.L.toFixed(2)}</strong>,
-            Cytokine C: <strong>${profile.C.toFixed(1)}</strong>
-          </p>
-          <p class="gut-card-text">
+        <div style="
+          background:#ffffff;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:600; color:#111827;">
+              갈등·혐오 지수 (염증 로드)
+            </span>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${conflictGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+            L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
+    conflictScore
+  )}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
             ${conflictText}
           </p>
-        </article>
+        </div>
 
-        <article class="gut-card gut-card--productivity">
-          <header class="gut-card-header">
-            <h3 class="gut-card-title">사회적 생산성/효율성</h3>
-            <div class="gut-card-grade">
-              <span class="gut-card-grade-letter">${productivityGrade}</span>
-              <span class="gut-card-grade-score">${pct(
-                productivityScore
-              )}</span>
-            </div>
-          </header>
-          <p class="gut-card-metric">
-            대사 효율 EEE: <strong>${profile.EEE.toFixed(2)}</strong>
-          </p>
-          <p class="gut-card-text">
+        <div style="
+          background:#ffffff;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:600; color:#111827;">
+              사회적 생산성 / 효율성
+            </span>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${productivityGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+            EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
             ${productivityText}
           </p>
-        </article>
-      </section>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -1478,8 +1548,6 @@ if (debugStartBtn) {
     scanResultStarted = false;
     scanOverallTimer = 0;
 
-    resetScanProgressUI();
-
     updateSensorStatus();
     setPhase("A0-1");
   });
@@ -1506,8 +1574,6 @@ if (btnReset) {
     microProgress = 0;
     scanResultStarted = false;
 
-    resetScanProgressUI();
-
     updateSensorStatus();
     setPhase("A0-1");
   });
@@ -1524,8 +1590,6 @@ if (btnYes) {
       purity = 0;
       microProgress = 0;
       scanResultStarted = false;
-
-      resetScanProgressUI();
 
       updateSensorStatus();
       setPhase("A0-1");

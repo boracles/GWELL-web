@@ -165,45 +165,7 @@
               </div>
             </div>
 
-            <!-- 메인 메시지 -->
             <div class="scan-main-message" id="scanMainMessage">
-              <!-- 메인 메시지 아래에 추가하면 좋아 -->
-              <div
-                class="scan-sequence"
-                id="scanSequence"
-                style="display: none"
-              >
-                <div class="scan-sequence-text" id="scanSequenceText">
-                  <!-- JS에서 단계별 문장 들어감 -->
-                </div>
-                <div class="scan-sequence-stepper">
-                  <div class="scan-sequence-progress-bar">
-                    <div
-                      class="scan-sequence-progress-inner"
-                      id="scanSequenceProgressInner"
-                    ></div>
-                  </div>
-                  <div class="scan-sequence-dots">
-                    <div class="scan-step" data-scan-step="0">
-                      <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
-                    </div>
-                    <div class="scan-step" data-scan-step="1">
-                      <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
-                    </div>
-                    <div class="scan-step" data-scan-step="2">
-                      <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
-                    </div>
-                    <div class="scan-step" data-scan-step="3">
-                      <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <h2 id="mainMessage">대기 중입니다.</h2>
               <p id="subMessage">
                 관람객 접근 전, 시스템은 장내자산 스캔을 준비하고 있습니다.
@@ -246,6 +208,40 @@
                   class="scan-progress-bar-inner"
                   id="progressBarInner"
                 ></div>
+              </div>
+
+              <div
+                class="scan-sequence"
+                id="scanSequence"
+                style="display: none"
+              >
+                <div class="scan-sequence-text" id="scanSequenceText"></div>
+                <div class="scan-sequence-stepper">
+                  <div class="scan-sequence-progress-bar">
+                    <div
+                      class="scan-sequence-progress-inner"
+                      id="scanSequenceProgressInner"
+                    ></div>
+                  </div>
+                  <div class="scan-sequence-dots">
+                    <div class="scan-step" data-scan-step="0">
+                      <span class="scan-step-dot"></span>
+                      <span class="scan-step-check">✔</span>
+                    </div>
+                    <div class="scan-step" data-scan-step="1">
+                      <span class="scan-step-dot"></span>
+                      <span class="scan-step-check">✔</span>
+                    </div>
+                    <div class="scan-step" data-scan-step="2">
+                      <span class="scan-step-dot"></span>
+                      <span class="scan-step-check">✔</span>
+                    </div>
+                    <div class="scan-step" data-scan-step="3">
+                      <span class="scan-step-dot"></span>
+                      <span class="scan-step-check">✔</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="scan-purity-row" id="purityRow">

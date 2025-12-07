@@ -19,6 +19,7 @@ let stripIdEl, stripRefEl, marketTimeEl;
 let metricPurityEl, metricEfficiencyEl, metricContributionEl, metricLevelEl;
 let comparisonBodyEl;
 let metricDiversityEl, metricBenefitEl, metricRiskEl;
+let volumeChart;
 
 // 캔들 차트 + 인디케이터 데이터
 let priceChart;
@@ -369,26 +370,33 @@ function formatNumber(num) {
 const lastValueLabelPlugin = {
   id: "lastValueLabel",
   afterDraw(chart, args, pluginOptions) {
+    // candlestick 차트만 처리
     if (chart.config.type !== "candlestick") return;
 
     const ds = chart.data.datasets[0];
     if (!ds || !ds.data || ds.data.length === 0) return;
 
     const last = ds.data[ds.data.length - 1];
-    if (last == null || last.c == null) return;
+    if (!last || last.c == null) return;
 
-    const yScale = chart.scales.y;
+    // 🔹 y 축 이름이 yPrice 이거나 y 일 수 있으니 안전하게 찾기
+    const yScale =
+      chart.scales["yPrice"] ||
+      chart.scales["y"] ||
+      Object.values(chart.scales)[0];
+
+    if (!yScale) return; // 축 못 찾으면 그냥 스킵
+
     const y = yScale.getPixelForValue(last.c);
     const xRight = chart.chartArea.right;
 
     const ctx = chart.ctx;
-    const label = formatNumber(last.c); // 기존 formatNumber 사용
+    const label = formatNumber(last.c);
 
     ctx.save();
     ctx.font = "11px -apple-system, system-ui, sans-serif";
     const textWidth = ctx.measureText(label).width;
     const paddingX = 6;
-    const paddingY = 3;
     const boxWidth = textWidth + paddingX * 2;
     const boxHeight = 18;
     const boxX = xRight + 4;
@@ -695,10 +703,10 @@ function initPriceChart() {
   globalHigh = v;
   globalLow = v;
 
-  // x를 0부터 시작하는 인덱스로 사용
-  candleData = [{ x: 0, o: v, h: v, l: v, c: v }];
-  lineData = [{ x: 0, y: v }];
-  volumeData = [{ x: 0, y: Math.abs(v - asset.prevValue || 1) }];
+  // 초기 배열 비우기
+  candleData = [];
+  lineData = [];
+  volumeData = []; // ← 이건 아래 indicator에서 쓸 거라 놔두되, 여기서는 안 그림
 
   const ctx = canvas.getContext("2d");
 
@@ -719,34 +727,24 @@ function initPriceChart() {
           yAxisID: "yPrice",
         },
         {
-          // 종가 라인
           type: "line",
           label: "Close",
           data: lineData,
           borderColor: "#facc15",
           borderWidth: 2,
           pointRadius: 0,
-          tension: 0.35, // 🔹 더 부드럽게
+          tension: 0.35,
           yAxisID: "yPrice",
-        },
-        {
-          // 거래량 막대
-          type: "bar",
-          label: "Volume",
-          data: volumeData,
-          yAxisID: "yVolume",
-          backgroundColor: "rgba(148, 163, 184, 0.45)",
-          borderWidth: 0,
-          barPercentage: 1.0,
-          categoryPercentage: 1.0,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: {
-        padding: 0,
+      layout: { padding: 0 },
+      animation: {
+        duration: 600,
+        easing: "easeOutQuad",
       },
       plugins: {
         legend: { display: false },
@@ -758,21 +756,20 @@ function initPriceChart() {
           grid: { display: false },
           offset: false,
           min: 0,
-          max: 0,
+          max: 60, // 처음엔 0~60 대충 범위
         },
         yPrice: {
           position: "right",
           ticks: { color: "#e5e7eb" },
           grid: { color: "rgba(148,163,184,0.3)" },
         },
-        yVolume: {
-          position: "right",
-          display: false, // 눈금 감추고
-          grid: { display: false },
-        },
       },
     },
   });
+
+  // 첫 캔들 하나 넣어서 바로 보이게
+  appendCandle();
+  updatePriceChart();
 }
 
 function appendCandle() {
@@ -789,41 +786,36 @@ function appendCandle() {
   globalHigh = globalHigh === null ? high : Math.max(globalHigh, high);
   globalLow = globalLow === null ? low : Math.min(globalLow, low);
 
-  // 새 데이터 push
-  candleData.push({ x: 0, o: open, h: high, l: low, c: close });
-  lineData.push({ x: 0, y: close });
+  // 🔹 변화량 기준 의사 거래량 + 방향
+  const { delta } = computeChangeRate(asset);
+  const vol = Math.abs(delta) + 1;
+  const dir = delta >= 0 ? "up" : "down";
 
-  const vol = Math.abs(close - open) + 1; // 🔹 간단한 의사 거래량
-  volumeData.push({ x: 0, y: vol });
+  candleData.push({ x: tick, o: open, h: high, l: low, c: close });
+  lineData.push({ x: tick, y: close });
+  volumeData.push({ x: tick, y: vol, dir });
 
-  // 최대 개수 넘으면 왼쪽부터 제거
   if (candleData.length > MAX_CANDLES) candleData.shift();
   if (lineData.length > MAX_CANDLES) lineData.shift();
   if (volumeData.length > MAX_CANDLES) volumeData.shift();
-
-  // 🔹 x 값을 0..n-1로 재인덱싱 → 스케일 변형 없이 안에서만 업데이트
-  for (let i = 0; i < candleData.length; i++) {
-    candleData[i].x = i;
-    lineData[i].x = i;
-    volumeData[i].x = i;
-  }
 }
 
 function updatePriceChart() {
   if (!priceChart) return;
 
   priceChart.data.datasets[0].data = candleData; // 캔들
-  priceChart.data.datasets[1].data = lineData; // 라인
-  priceChart.data.datasets[2].data = volumeData; // 볼륨
+  priceChart.data.datasets[1].data = lineData; // 종가 라인
 
   if (candleData.length > 0) {
-    const n = candleData.length;
+    const lastX = candleData[candleData.length - 1].x;
+    const WINDOW = 60;
+
     const xScale = priceChart.options.scales.x;
-    xScale.min = 0;
-    xScale.max = n - 1; // 항상 0~n-1 고정 → 전체 프레임이 안 출렁거림
+    xScale.max = lastX + 0.5;
+    xScale.min = lastX - (WINDOW - 0.5);
   }
 
-  priceChart.update("none");
+  priceChart.update();
 }
 
 // ====== 인디케이터 차트 (정상성 지수) ======
@@ -840,35 +832,50 @@ function computeNormalityIndex(asset) {
   return idx;
 }
 
-function initIndicatorChart() {
-  const canvas = document.getElementById("indicatorChart");
+function initVolumeChart() {
+  const canvas = document.getElementById("volumeChart");
   if (!canvas) return;
-
-  const asset = getMainAsset();
-  const firstIdx = computeNormalityIndex(asset);
-
-  indicatorData = [{ x: tick, y: firstIdx }];
 
   const ctx = canvas.getContext("2d");
 
-  indicatorChart = new Chart(ctx, {
-    type: "line",
+  volumeChart = new Chart(ctx, {
+    type: "bar",
     data: {
       datasets: [
         {
-          data: indicatorData,
+          // 🔹 하단 막대
+          type: "bar",
+          label: "Δ Volume",
+          data: volumeData,
+          yAxisID: "yVol",
+          borderWidth: 0,
+          barPercentage: 1.0,
+          categoryPercentage: 1.0,
+          backgroundColor: (ctx) => {
+            const v = ctx.raw;
+            if (!v) return "rgba(148,163,184,0.4)";
+            return v.dir === "up"
+              ? "rgba(74, 222, 128, 0.8)" // up = 초록 (#4ade80 톤)
+              : "rgba(249, 115, 115, 0.8)"; // down = 빨강 (#f97373 톤)
+          },
+        },
+        {
+          // 🔹 하단 라인 (Δ 라인)
+          type: "line",
+          label: "Δ Line",
+          data: volumeData,
+          yAxisID: "yVol",
+          borderColor: "#facc15",
           borderWidth: 1.5,
-          tension: 0.3,
           pointRadius: 0,
-          fill: true,
-          borderColor: "#8b5cf6",
-          backgroundColor: "rgba(139, 92, 246, 0.18)",
+          tension: 0.35,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: 0 },
       plugins: {
         legend: { display: false },
       },
@@ -878,16 +885,96 @@ function initIndicatorChart() {
           ticks: { display: false },
           grid: { display: false },
         },
-        y: {
-          min: 0,
-          max: 100,
+        yVol: {
+          position: "right",
+          ticks: { display: false },
+          grid: { display: false },
+        },
+      },
+    },
+  });
+}
+
+function updateVolumeChart() {
+  if (!volumeChart) return;
+
+  volumeChart.data.datasets[0].data = volumeData; // 막대
+  volumeChart.data.datasets[1].data = volumeData; // Δ 라인
+
+  if (volumeData.length > 0) {
+    const lastX = volumeData[volumeData.length - 1].x;
+    const WINDOW = 60;
+    const xScale = volumeChart.options.scales.x;
+
+    xScale.max = lastX + 0.5;
+    xScale.min = lastX - (WINDOW - 0.5);
+  }
+
+  volumeChart.update("none");
+}
+
+function initIndicatorChart() {
+  const canvas = document.getElementById("indicatorChart");
+  if (!canvas) return;
+
+  indicatorData = [];
+
+  const ctx = canvas.getContext("2d");
+
+  indicatorChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      datasets: [
+        {
+          // 🔹 변화량 막대 (하단 박스)
+          type: "bar",
+          label: "Δ Volume",
+          data: indicatorData,
+          yAxisID: "yInd",
+          borderWidth: 0,
+          barPercentage: 1.0,
+          categoryPercentage: 1.0,
+          backgroundColor: (ctx) => {
+            const v = ctx.raw;
+            if (!v) return "rgba(148,163,184,0.4)";
+            // 캔들 색과 맞추기
+            return v.dir === "up"
+              ? "rgba(74, 222, 128, 0.8)" // up (위 캔들의 #4ade80)
+              : "rgba(249, 115, 115, 0.8)"; // down (위 캔들의 #f97373)
+          },
+        },
+        {
+          // 🔹 변화량 라인 (막대를 반영하는 라인)
+          type: "line",
+          label: "Δ Line",
+          data: indicatorData,
+          yAxisID: "yInd",
+          borderColor: "#facc15", // 노란 라인
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.35,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: 0 },
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: {
+          type: "linear",
+          ticks: { display: false },
+          grid: { display: false },
+        },
+        yInd: {
+          position: "right",
           ticks: {
-            color: "#e5e7eb",
-            font: { size: 9 },
+            display: false,
           },
-          grid: {
-            color: "rgba(148,163,184,0.25)",
-          },
+          grid: { display: false },
         },
       },
     },
@@ -896,8 +983,17 @@ function initIndicatorChart() {
 
 function appendIndicatorPoint() {
   const asset = getMainAsset();
-  const idx = computeNormalityIndex(asset);
-  indicatorData.push({ x: tick, y: idx });
+  const { delta } = computeChangeRate(asset); // 위에서 쓰는 함수
+
+  const strength = Math.abs(delta); // y값: 변화량 크기
+  const dir = delta >= 0 ? "up" : "down";
+
+  indicatorData.push({
+    x: tick,
+    y: strength,
+    dir, // "up" | "down"
+  });
+
   if (indicatorData.length > MAX_INDICATOR_POINTS) {
     indicatorData.shift();
   }
@@ -905,7 +1001,19 @@ function appendIndicatorPoint() {
 
 function updateIndicatorChart() {
   if (!indicatorChart) return;
-  indicatorChart.data.datasets[0].data = indicatorData;
+
+  indicatorChart.data.datasets[0].data = indicatorData; // 막대
+  indicatorChart.data.datasets[1].data = indicatorData; // 같은 데이터로 라인
+
+  if (indicatorData.length > 0) {
+    const lastX = indicatorData[indicatorData.length - 1].x;
+    const WINDOW = 60;
+    const xScale = indicatorChart.options.scales.x;
+
+    xScale.max = lastX + 0.5;
+    xScale.min = lastX - (WINDOW - 0.5);
+  }
+
   indicatorChart.update("none");
 }
 
@@ -935,6 +1043,7 @@ function step() {
   renderScanParams();
   renderComparisonTable();
   updatePriceChart();
+  updateVolumeChart();
   updateIndicatorChart();
 }
 
@@ -1000,7 +1109,11 @@ function init() {
   renderTicker();
   renderScanParams();
   renderComparisonTable();
+
   initPriceChart();
+
+  initVolumeChart();
+
   initIndicatorChart();
 
   setInterval(step, TICK_INTERVAL_MS);

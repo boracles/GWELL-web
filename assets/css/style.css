@@ -397,6 +397,11 @@ body {
   overflow: hidden;
 }
 
+.scan-sequence-progress-inner {
+  width: 0;
+  transition: width 0.8s ease;
+}
+
 .scan-progress-bar-inner {
   height: 100%;
   width: 0%;
@@ -1610,6 +1615,47 @@ body {
 }
 
 .chart-main canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* ====== 캔들 + 볼륨 2층 레이아웃 ====== */
+
+.chart-panel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* 전체 캔들/볼륨 박스 */
+.chart-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 340px; /* 전체 높이 */
+}
+
+/* 위: 캔들 박스 */
+.chart-main-top {
+  flex: 3;
+  background: #140823; /* 캔들 배경 */
+  padding: 6px 8px 4px;
+}
+
+/* 아래: Δ 막대 박스 */
+.chart-main-bottom {
+  flex: 1;
+  background: #050816; /* 🔹 캔들과 다른 톤 */
+  padding: 4px 8px 4px;
+}
+
+/* 두 캔버스 모두 영역 채우기 */
+.chart-main-top canvas,
+.chart-main-bottom canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;

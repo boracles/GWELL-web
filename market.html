@@ -131,11 +131,20 @@
             </div>
           </section>
 
-          <!-- 메인 차트 + 아래 인디케이터 -->
           <section class="chart-panel">
             <div class="chart-main">
-              <canvas id="priceChart"></canvas>
+              <!-- 위: 캔들 + 종가 라인 -->
+              <div class="chart-main-top">
+                <canvas id="priceChart"></canvas>
+              </div>
+
+              <!-- 아래: 변화량(Δ) 막대 + Δ 라인 -->
+              <div class="chart-main-bottom">
+                <canvas id="volumeChart"></canvas>
+              </div>
             </div>
+
+            <!-- 이건 그대로: 정상성 지수 -->
             <div class="chart-indicator">
               <div class="indicator-label">정상성 지수 (0–100)</div>
               <canvas id="indicatorChart"></canvas>
