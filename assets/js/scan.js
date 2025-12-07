@@ -698,20 +698,19 @@ function initMicrobeScene() {
   microRenderer.setSize(width, height);
 
   microScene = new THREE.Scene();
-  microScene.fog = new THREE.FogExp2(0x050816, 0.008);
+  microScene.fog = new THREE.FogExp2(0x050816, 0.015); // 살짝 더 진한 안개
 
   microCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
-  // 훨씬 멀리서 보기
-  microCamera.position.set(0, 0, 60);
+  // 기본은 조금 떨어져 있다가 → 점점 줌 인 할 거라 여기선 베이스만
+  microCamera.position.set(0, 0, 55);
 
-  const amb = new THREE.AmbientLight(0xffffff, 0.6);
+  const amb = new THREE.AmbientLight(0xffffff, 0.7);
   const dir = new THREE.DirectionalLight(0xffffff, 0.9);
   dir.position.set(5, 10, 7);
   microScene.add(amb, dir);
 
   microGroup = new THREE.Group();
-  // 그룹 전체를 화면 뒤쪽으로 조금 밀기
-  microGroup.position.z = -10;
+  microGroup.position.z = -6; // 너무 멀리 가지 말고 가까운 층에
   microScene.add(microGroup);
 
   const loader = new window.GLTFLoader();
@@ -730,35 +729,38 @@ function initMicrobeScene() {
 
   Promise.all(loadPromises)
     .then((scenes) => {
-      const COUNT = 40; // 전체 미생물 개수 (조금 줄이기)
+      const COUNT = 70; // 개체 수는 조금 많은데, 처음엔 일부만 등장시킴
 
       for (let i = 0; i < COUNT; i++) {
-        // 4개 glb를 번갈아 사용
         const baseScene = scenes[i % scenes.length].clone(true);
 
         const wrapper = new THREE.Group();
         wrapper.add(baseScene);
 
-        // 화면 중앙을 중심으로, 더 멀리 퍼진 구름
-        const radius = 20 + Math.random() * 15; // 20 ~ 35 사이
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
+        // 기본 반지름: 처음엔 거의 중앙(2~4), 최대 12 정도까지 퍼짐
+        const baseRadius = 2 + Math.random() * 10; // 2 ~ 12
+        const baseAngle = Math.random() * Math.PI * 2;
+        const baseHeight = (Math.random() - 0.5) * 4; // 살짝 위아래
 
-        const x = radius * Math.sin(phi) * Math.cos(theta);
-        const y = radius * Math.sin(phi) * Math.sin(theta);
-        const z = radius * Math.cos(phi);
+        // 초기 위치는 거의 중앙 근처
+        wrapper.position.set(
+          Math.cos(baseAngle) * 0.5,
+          Math.sin(baseAngle) * 0.5,
+          baseHeight * 0.1
+        );
 
-        wrapper.position.set(x, y, z);
+        const baseScale = 0.16 + Math.random() * 0.12; // 좀 더 크게
 
-        // 많이 작게 → 파티클처럼
-        const baseScale = 0.08 + Math.random() * 0.12; // 0.08 ~ 0.2
         wrapper.scale.set(baseScale, baseScale, baseScale);
 
         wrapper.userData = {
-          basePos: wrapper.position.clone(),
+          baseRadius, // 최대로 퍼질 거리
+          baseAngle, // 기본 각도
+          baseHeight, // 기본 높이
           baseScale,
           offset: Math.random() * 1000,
           swirlDir: Math.random() > 0.5 ? 1 : -1,
+          spawnOffset: Math.random(), // 0~1 사이: 언제 등장할지
         };
 
         microGroup.add(wrapper);
@@ -793,33 +795,73 @@ function animateMicrobes() {
   const now = performance.now();
   const t = (now - microStartTime) * 0.001;
 
+  // 🔹 스캔 진행도(0~1): B1~B3, C1 구간에서만 증가
+  let scanProgress = 0;
+  if (currentPhase === "B1" || currentPhase === "B2" || currentPhase === "B3") {
+    scanProgress = Math.min(1, scanTimer / scanTotal);
+  } else if (currentPhase === "C1") {
+    scanProgress = 1;
+  }
+
+  // 🔹 카메라 줌 인: 진행될수록 점점 가까이
+  const camStartZ = 55;
+  const camEndZ = 28; // 최종엔 꽤 크게 보이게
+  const camZ = camStartZ - (camStartZ - camEndZ) * scanProgress;
+  microCamera.position.z = camZ;
+  microCamera.lookAt(0, 0, 0);
+  microCamera.updateProjectionMatrix();
+
+  // 그룹 전체도 약간 천천히 회전
+  microGroup.rotation.y = Math.sin(t * 0.12) * 0.25;
+  microGroup.rotation.x = Math.sin(t * 0.07) * 0.08;
+
   microGroup.children.forEach((wrapper) => {
     const d = wrapper.userData;
-    const wobble = Math.sin(t * 1.2 + d.offset) * 0.4;
-    const wobble2 = Math.cos(t * 0.9 + d.offset * 1.3) * 0.4;
 
-    const r = d.basePos.length();
-    const phase = t * 0.25 + d.offset * 0.1 * d.swirlDir;
+    // 🔹 이 개체가 언제부터 등장할지: spawnOffset 기준으로 순차 등장
+    // scanProgress (0~1)에 따라 등장 여부/강도 결정
+    let appear = (scanProgress * 1.2 - d.spawnOffset) / 0.5; // 대략 앞/뒤로 여유
+    if (appear < 0) appear = 0;
+    if (appear > 1) appear = 1;
 
-    const x = r * Math.sin(phase) * Math.cos(d.offset);
-    const y = r * Math.sin(phase) * Math.sin(d.offset);
-    const z = r * Math.cos(phase);
+    // 등장 전에는 거의 0으로 축소시켜버림
+    if (appear <= 0) {
+      wrapper.visible = false;
+      return;
+    }
+    wrapper.visible = true;
 
-    wrapper.position.set(
-      x + wobble * 0.8,
-      y + wobble2 * 0.8,
-      z + Math.sin(t * 0.7 + d.offset) * 0.6
-    );
+    // 🔹 반지름: 처음엔 거의 중앙 → 나중에 d.baseRadius 까지 퍼짐
+    const r = d.baseRadius * (0.2 + 0.8 * appear);
 
-    wrapper.rotation.x += 0.01 * d.swirlDir;
-    wrapper.rotation.y += 0.013;
+    // 🔹 미생물 "헤엄" 느낌: 큰 궤도 말고, 제자리 근처에서 꿈틀
+    const swimPhase = t * 0.9 + d.offset;
+    const wobbleSmall = Math.sin(swimPhase * 1.3) * 0.4;
+    const wobbleSmall2 = Math.cos(swimPhase * 1.1) * 0.4;
 
-    const breath = 1 + Math.sin(t * 1.5 + d.offset) * 0.15;
-    const s = d.baseScale * breath;
+    // 기본 각도로 둥글게 배치 + 살짝씩 회전하는 느낌
+    const angle =
+      d.baseAngle + Math.sin(t * 0.25 + d.offset * 0.2) * 0.4 * d.swirlDir;
+
+    const x = Math.cos(angle) * r + wobbleSmall;
+    const y =
+      Math.sin(angle) * r + wobbleSmall2 + Math.sin(t * 0.5 + d.offset) * 0.3;
+    const z =
+      d.baseHeight * (0.3 + 0.5 * appear) +
+      Math.sin(t * 0.7 + d.offset * 0.5) * 0.6;
+
+    wrapper.position.set(x, y, z);
+
+    // 🔹 회전: 자기 몸을 살짝 비틀면서 헤엄치는 느낌
+    wrapper.rotation.x += 0.015 * d.swirlDir;
+    wrapper.rotation.y += 0.02;
+    wrapper.rotation.z += Math.sin(t * 0.8 + d.offset) * 0.004;
+
+    // 🔹 스케일: 등장하면서 커지고, 호흡하듯이 약간씩 변함
+    const breath = 1 + Math.sin(t * 1.6 + d.offset) * 0.15;
+    const s = d.baseScale * (0.4 + 0.8 * appear) * breath;
     wrapper.scale.set(s, s, s);
   });
-
-  microGroup.rotation.y = Math.sin(t * 0.15) * 0.35;
 
   microRenderer.render(microScene, microCamera);
   microAnimReq = requestAnimationFrame(animateMicrobes);
