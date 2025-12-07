@@ -46,7 +46,8 @@ const scanSequenceProgressInnerEl = document.getElementById(
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
-let currentPhase = "A0-1"; // A0-1, A0-2, A1-1, POSTURE, A1-2, B1, B2, B3, C1, C2, ...
+let currentPhase = "A0-1";
+let scanRunning = false;
 let pirOn = false;
 let pressureOn = false;
 
@@ -570,6 +571,9 @@ function setPhase(phase) {
     }
 
     case "A1-2":
+      if (scanRunning) return;
+      scanRunning = true;
+
       if (postureEl) postureEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "flex";
       if (scanMainMessageEl) scanMainMessageEl.style.display = "block";
@@ -684,7 +688,9 @@ function setPhase(phase) {
         "시스템 점검이 필요하면 직원에게 말씀해 주세요.";
       scanBgEl.className = "scan-bg noise";
       scanBgEl.style.opacity = 0.5;
+
       showMicrobes(false);
+      scanRunning = false;
       break;
 
     default:
@@ -1547,6 +1553,7 @@ if (debugStartBtn) {
     microProgress = 0;
     scanResultStarted = false;
     scanOverallTimer = 0;
+    scanrunning = false;
 
     updateSensorStatus();
     setPhase("A0-1");

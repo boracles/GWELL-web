@@ -132,22 +132,24 @@
           </section>
 
           <section class="chart-panel">
-            <div class="chart-main">
-              <!-- 위: 캔들 + 종가 라인 -->
-              <div class="chart-main-top">
-                <canvas id="priceChart"></canvas>
+            <div class="chart-panel">
+              <!-- 🔹 캔들 + 볼륨: 같은 구역 -->
+              <div class="chart-main">
+                <div class="chart-main-top">
+                  <canvas id="priceChart"></canvas>
+                  <!-- 캔들 -->
+                </div>
+                <div class="chart-main-bottom">
+                  <canvas id="volumeChart"></canvas>
+                  <!-- 막대 -->
+                </div>
               </div>
 
-              <!-- 아래: 변화량(Δ) 막대 + Δ 라인 -->
-              <div class="chart-main-bottom">
-                <canvas id="volumeChart"></canvas>
-              </div>
-            </div>
-
-            <!-- 이건 그대로: 정상성 지수 -->
-            <div class="chart-indicator">
-              <div class="indicator-label">정상성 지수 (0–100)</div>
-              <canvas id="indicatorChart"></canvas>
+              <!-- 🔹 아래 별도: 정상성 지수 인디케이터 -->
+              <section class="chart-indicator">
+                <div class="indicator-label">정상성 지수</div>
+                <canvas id="indicatorChart"></canvas>
+              </section>
             </div>
           </section>
 

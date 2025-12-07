@@ -917,42 +917,23 @@ function initIndicatorChart() {
   const canvas = document.getElementById("indicatorChart");
   if (!canvas) return;
 
-  indicatorData = [];
-
   const ctx = canvas.getContext("2d");
 
+  indicatorData = [];
+
   indicatorChart = new Chart(ctx, {
-    type: "bar",
+    type: "line",
     data: {
       datasets: [
         {
-          // 🔹 변화량 막대 (하단 박스)
-          type: "bar",
-          label: "Δ Volume",
           data: indicatorData,
-          yAxisID: "yInd",
-          borderWidth: 0,
-          barPercentage: 1.0,
-          categoryPercentage: 1.0,
-          backgroundColor: (ctx) => {
-            const v = ctx.raw;
-            if (!v) return "rgba(148,163,184,0.4)";
-            // 캔들 색과 맞추기
-            return v.dir === "up"
-              ? "rgba(74, 222, 128, 0.8)" // up (위 캔들의 #4ade80)
-              : "rgba(249, 115, 115, 0.8)"; // down (위 캔들의 #f97373)
-          },
-        },
-        {
-          // 🔹 변화량 라인 (막대를 반영하는 라인)
-          type: "line",
-          label: "Δ Line",
-          data: indicatorData,
-          yAxisID: "yInd",
-          borderColor: "#facc15", // 노란 라인
+          yAxisID: "yIdx",
           borderWidth: 1.5,
+          tension: 0.3,
           pointRadius: 0,
-          tension: 0.35,
+          fill: true,
+          borderColor: "#8b5cf6",
+          backgroundColor: "rgba(139, 92, 246, 0.18)",
         },
       ],
     },
@@ -969,12 +950,17 @@ function initIndicatorChart() {
           ticks: { display: false },
           grid: { display: false },
         },
-        yInd: {
+        yIdx: {
           position: "right",
+          min: 0,
+          max: 100,
           ticks: {
-            display: false,
+            color: "#e5e7eb",
+            font: { size: 9 },
           },
-          grid: { display: false },
+          grid: {
+            color: "rgba(148,163,184,0.25)",
+          },
         },
       },
     },
@@ -983,15 +969,11 @@ function initIndicatorChart() {
 
 function appendIndicatorPoint() {
   const asset = getMainAsset();
-  const { delta } = computeChangeRate(asset); // 위에서 쓰는 함수
-
-  const strength = Math.abs(delta); // y값: 변화량 크기
-  const dir = delta >= 0 ? "up" : "down";
+  const idx = computeNormalityIndex(asset); // 0~100 지수
 
   indicatorData.push({
     x: tick,
-    y: strength,
-    dir, // "up" | "down"
+    y: idx,
   });
 
   if (indicatorData.length > MAX_INDICATOR_POINTS) {
@@ -1002,8 +984,7 @@ function appendIndicatorPoint() {
 function updateIndicatorChart() {
   if (!indicatorChart) return;
 
-  indicatorChart.data.datasets[0].data = indicatorData; // 막대
-  indicatorChart.data.datasets[1].data = indicatorData; // 같은 데이터로 라인
+  indicatorChart.data.datasets[0].data = indicatorData;
 
   if (indicatorData.length > 0) {
     const lastX = indicatorData[indicatorData.length - 1].x;
