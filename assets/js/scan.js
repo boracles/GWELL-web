@@ -700,8 +700,9 @@ function initMicrobeScene() {
   microScene = new THREE.Scene();
   microScene.fog = new THREE.FogExp2(0x050816, 0.008);
 
-  microCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-  microCamera.position.set(0, 0, 26);
+  microCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
+  // 훨씬 멀리서 보기
+  microCamera.position.set(0, 0, 60);
 
   const amb = new THREE.AmbientLight(0xffffff, 0.6);
   const dir = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -709,6 +710,8 @@ function initMicrobeScene() {
   microScene.add(amb, dir);
 
   microGroup = new THREE.Group();
+  // 그룹 전체를 화면 뒤쪽으로 조금 밀기
+  microGroup.position.z = -10;
   microScene.add(microGroup);
 
   const loader = new window.GLTFLoader();
@@ -727,7 +730,7 @@ function initMicrobeScene() {
 
   Promise.all(loadPromises)
     .then((scenes) => {
-      const COUNT = 60; // 전체 미생물 개수
+      const COUNT = 40; // 전체 미생물 개수 (조금 줄이기)
 
       for (let i = 0; i < COUNT; i++) {
         // 4개 glb를 번갈아 사용
@@ -736,8 +739,8 @@ function initMicrobeScene() {
         const wrapper = new THREE.Group();
         wrapper.add(baseScene);
 
-        // 화면 가운데를 중심으로 구(구체 껍질) 안에 랜덤 배치
-        const radius = 7 + Math.random() * 4;
+        // 화면 중앙을 중심으로, 더 멀리 퍼진 구름
+        const radius = 20 + Math.random() * 15; // 20 ~ 35 사이
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
 
@@ -747,7 +750,8 @@ function initMicrobeScene() {
 
         wrapper.position.set(x, y, z);
 
-        const baseScale = 0.4 + Math.random() * 0.8;
+        // 많이 작게 → 파티클처럼
+        const baseScale = 0.08 + Math.random() * 0.12; // 0.08 ~ 0.2
         wrapper.scale.set(baseScale, baseScale, baseScale);
 
         wrapper.userData = {

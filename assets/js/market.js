@@ -18,6 +18,7 @@ let statOpenEl, statHighEl, statLowEl, stat52HighEl, stat52LowEl;
 let stripIdEl, stripRefEl, marketTimeEl;
 let metricPurityEl, metricEfficiencyEl, metricContributionEl, metricLevelEl;
 let comparisonBodyEl;
+let metricDiversityEl, metricBenefitEl, metricRiskEl;
 
 // 캔들 차트 + 인디케이터 데이터
 let priceChart;
@@ -561,6 +562,36 @@ function renderScanParams() {
     metricLevelEl.classList.add("metric-warn");
   }
 
+  // --- 장내 원천 지표 D/B/P 표시 ---
+  if (metricDiversityEl && metricBenefitEl && metricRiskEl) {
+    const d = Math.round(asset.D * 100);
+    const b = Math.round(asset.B * 100);
+    const p = Math.round(asset.P * 100);
+
+    metricDiversityEl.textContent = d + "%";
+    metricBenefitEl.textContent = b + "%";
+    metricRiskEl.textContent = p + "%";
+
+    [metricDiversityEl, metricBenefitEl, metricRiskEl].forEach((el) => {
+      el.classList.remove("metric-good", "metric-bad", "metric-warn");
+    });
+
+    // 다양성: 너무 낮거나 너무 높으면 불안정, 중간범위가 좋음
+    if (d >= 50 && d <= 80) metricDiversityEl.classList.add("metric-good");
+    else if (d < 30 || d > 90) metricDiversityEl.classList.add("metric-bad");
+    else metricDiversityEl.classList.add("metric-warn");
+
+    // 유익도: 높을수록 좋음
+    if (b >= 70) metricBenefitEl.classList.add("metric-good");
+    else if (b < 40) metricBenefitEl.classList.add("metric-bad");
+    else metricBenefitEl.classList.add("metric-warn");
+
+    // 위험도(P): 낮을수록 좋음
+    if (p <= 20) metricRiskEl.classList.add("metric-good");
+    else if (p >= 60) metricRiskEl.classList.add("metric-bad");
+    else metricRiskEl.classList.add("metric-warn");
+  }
+
   if (tickerMetaEl) {
     tickerMetaEl.textContent =
       `정제율 ${m.purity}% · 사회 효율 환산가 ${m.efficiency}` +
@@ -891,6 +922,10 @@ function init() {
   metricEfficiencyEl = document.getElementById("metricEfficiency");
   metricContributionEl = document.getElementById("metricContribution");
   metricLevelEl = document.getElementById("metricLevel");
+
+  metricDiversityEl = document.getElementById("metricDiversity"); // 🔹 추가
+  metricBenefitEl = document.getElementById("metricBenefit"); // 🔹 추가
+  metricRiskEl = document.getElementById("metricRisk");
 
   comparisonBodyEl = document.getElementById("comparisonBody"); // ✅ 추가
 

@@ -58,18 +58,15 @@
 
               <div class="mt-rate-line">
                 <span class="mt-rate" id="tickerRate">+0.00%</span>
-                <span class="mt-sub" id="tickerSub"
-                  >장내 자산 실시간 상장 상태.</span
-                >
+                <span class="mt-sub" id="tickerSub">
+                  장내 자산 실시간 상장 상태
+                </span>
               </div>
-
-              <div class="mt-meta" id="tickerMeta">
-                정제율 0% · 사회 효율 환산가 0.00 · 사회 기여도 - · 거래 등급
-                Lv0
-              </div>
+              <!-- 🔹 여기서 mt-meta 블록 완전히 제거 -->
             </div>
 
             <!-- 우: 기본 시세 + 장내 파라미터 -->
+            <!-- 우: 기본 시세 + 장내 파라미터 + 장내 원천 지표 -->
             <div class="market-top-right">
               <!-- 왼쪽 컬럼: 시세 정보 -->
               <div class="mt-stat-col">
@@ -95,7 +92,7 @@
                 </div>
               </div>
 
-              <!-- 오른쪽 컬럼: 장내 스캔 파라미터 -->
+              <!-- 가운데 컬럼: 사회 파라미터 -->
               <div class="mt-stat-col">
                 <div class="mt-stat-row">
                   <span class="label">정제율</span>
@@ -112,6 +109,22 @@
                 <div class="mt-stat-row">
                   <span class="label">거래 등급</span>
                   <span class="value" id="metricLevel">Lv0</span>
+                </div>
+              </div>
+
+              <!-- 오른쪽 컬럼: 장내 원천 지표 D/B/P -->
+              <div class="mt-stat-col mt-gut-col">
+                <div class="mt-stat-row">
+                  <span class="label">다양성 (D)</span>
+                  <span class="value" id="metricDiversity">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">유익도 (B)</span>
+                  <span class="value" id="metricBenefit">-</span>
+                </div>
+                <div class="mt-stat-row">
+                  <span class="label">위험도 (P)</span>
+                  <span class="value" id="metricRisk">-</span>
                 </div>
               </div>
             </div>
