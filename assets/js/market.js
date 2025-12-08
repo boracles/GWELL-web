@@ -7,6 +7,10 @@ const ISSUE_CHANGE_EVERY = 12;
 let tick = 0;
 let currentIssue = null;
 
+const COLOR_UP = "#0FEDBE";
+const COLOR_DOWN = "#F63C6B";
+const COLOR_UNCHANGED = "#FAF2E5"; // 필요하면 유지
+
 // 메인으로 보여줄 자산 (첫 번째 자산 기준)
 const MAIN_ASSET_INDEX = 0;
 
@@ -719,9 +723,9 @@ function initPriceChart() {
           label: asset.id,
           data: candleData,
           color: {
-            up: "#4ade80",
-            down: "#f97373",
-            unchanged: "#e5e7eb",
+            up: COLOR_UP,
+            down: COLOR_DOWN,
+            unchanged: COLOR_UNCHANGED,
           },
           borderColor: "#e5e7eb",
           yAxisID: "yPrice",
@@ -838,12 +842,21 @@ function initVolumeChart() {
 
   const ctx = canvas.getContext("2d");
 
+  // 🔹 위 캔들 차트에서 실제 색을 가져온다
+  const candleDataset = priceChart?.data?.datasets?.[0];
+  const upColor =
+    (candleDataset && candleDataset.color && candleDataset.color.up) ||
+    "#4ade80";
+  const downColor =
+    (candleDataset && candleDataset.color && candleDataset.color.down) ||
+    "#f97373";
+
   volumeChart = new Chart(ctx, {
     type: "bar",
     data: {
       datasets: [
         {
-          // 🔹 하단 막대
+          // 🔹 하단 막대 (캔들과 같은 색)
           type: "bar",
           label: "Δ Volume",
           data: volumeData,
@@ -854,9 +867,8 @@ function initVolumeChart() {
           backgroundColor: (ctx) => {
             const v = ctx.raw;
             if (!v) return "rgba(148,163,184,0.4)";
-            return v.dir === "up"
-              ? "rgba(74, 222, 128, 0.8)" // up = 초록 (#4ade80 톤)
-              : "rgba(249, 115, 115, 0.8)"; // down = 빨강 (#f97373 톤)
+
+            return v.dir === "up" ? COLOR_UP : COLOR_DOWN;
           },
         },
         {
@@ -884,6 +896,7 @@ function initVolumeChart() {
           type: "linear",
           ticks: { display: false },
           grid: { display: false },
+          offset: false, // 🔹 위 priceChart랑 똑같이
         },
         yVol: {
           position: "right",

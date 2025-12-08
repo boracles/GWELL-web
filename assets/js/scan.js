@@ -26,15 +26,6 @@ const postureLine4El = document.getElementById("postureLine4");
 const postureProgressInner = document.getElementById("postureProgressInner");
 const postureStepEls = document.querySelectorAll(".posture-step[data-step]");
 
-// 🔹 스캔 단계 시퀀스 (로딩바 밑 점 + 문장 1개)
-// HTML 쪽에 이런 구조가 있다고 가정:
-// <div id="scanSequence">
-//   <div id="scanSequenceText"></div>
-//   <div class="scan-sequence-steps">
-//     <div class="scan-step" data-scan-step="0"><span class="scan-step-check">✔</span></div>
-//     ...
-//   </div>
-// </div>
 const scanSequenceEl = document.getElementById("scanSequence");
 const scanSequenceTextEl = document.getElementById("scanSequenceText");
 const scanStepEls = document.querySelectorAll(".scan-step[data-scan-step]");
@@ -80,6 +71,10 @@ const subMessageEl = document.getElementById("subMessage");
 const secondaryMessageEl = document.getElementById("secondaryMessage");
 const warningMessageEl = document.getElementById("warningMessage");
 const resultListEl = document.getElementById("resultList");
+
+const scanResultLayoutEl = document.getElementById("scanResultLayout");
+const gutVisualEl = document.getElementById("gutVisual");
+const gutImageEl = document.getElementById("gutImage");
 
 const progressLabelEl = document.getElementById("progressLabel");
 const progressTimeEl = document.getElementById("progressTime");
@@ -266,7 +261,9 @@ const SCAN_STEP_COUNT = scanStepTexts.length;
 let currentScanStep = -1;
 
 // 🔹 stepIdx: 0~3, -1이면 숨김
-function updateScanStepUI(stepIdx) {
+// stepIdx: 현재 진행 중인 단계(0~3)
+// completedCount: "완료"로 볼 수 있는 칸 개수(0~4). 생략하면 stepIdx+1로 처리.
+function updateScanStepUI(stepIdx, completedCount) {
   if (!scanSequenceEl) return;
 
   if (stepIdx < 0) {
@@ -278,22 +275,28 @@ function updateScanStepUI(stepIdx) {
       const check = el.querySelector(".scan-step-check");
       if (check) check.style.opacity = "0";
     });
+    currentScanStep = -1;
     return;
   }
 
   const idx = Math.max(0, Math.min(SCAN_STEP_COUNT - 1, stepIdx));
-
   scanSequenceEl.style.display = "block";
 
-  // 문장
+  // 현재 단계 문장
   if (scanSequenceTextEl) {
     scanSequenceTextEl.textContent = scanStepTexts[idx];
   }
 
-  // 체크 (해당 구간까지 완료된 칸만)
+  // 완료된 칸 개수 (0~4)
+  const maxCompleted =
+    completedCount !== undefined
+      ? Math.max(0, Math.min(SCAN_STEP_COUNT, completedCount))
+      : idx + 1;
+
+  // 체크: "완료된 칸"까지만 ✔
   scanStepEls.forEach((el, i) => {
     const check = el.querySelector(".scan-step-check");
-    const completed = i <= idx;
+    const completed = i < maxCompleted; // 🔹 '<' 로 바꿔서 마지막은 100% 때만
     el.classList.toggle("completed", completed);
     if (check) check.style.opacity = completed ? "1" : "0";
   });
@@ -312,6 +315,9 @@ function setPhase(phase) {
   if (warningMessageEl) warningMessageEl.style.display = "none";
   if (resultListEl) resultListEl.style.display = "none";
   if (decisionButtonsEl) decisionButtonsEl.style.display = "none";
+
+  if (scanResultLayoutEl) scanResultLayoutEl.style.display = "none";
+  if (gutVisualEl) gutVisualEl.style.display = "none";
 
   const isStandby = phase === "A0-1" || phase === "A0-2";
 
@@ -646,6 +652,10 @@ function setPhase(phase) {
       subMessageEl.textContent = "";
       secondaryMessageEl.textContent =
         "이 장내 데이터를 사회 자산으로 상장하시겠습니까?";
+
+      if (scanResultLayoutEl) scanResultLayoutEl.style.display = "grid";
+      if (gutVisualEl) gutVisualEl.style.display = "flex";
+
       decisionButtonsEl.style.display = "flex";
       renderAnalysisResult();
       showMicrobes(false);
@@ -734,17 +744,11 @@ function updateProgress() {
   }
 
   if (isScanPhase) {
-    // 🔹 전체 스캔 진행도 (0~1)
+    // 🔹 전체 스캔 진행도 (0~1) → 시간/남은시간용
     const ratio = Math.min(
       1,
       Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
     );
-
-    // 로딩바 폭
-    progressBarInnerEl.style.width = `${ratio * 100}%`;
-    if (scanSequenceProgressInnerEl) {
-      scanSequenceProgressInnerEl.style.width = `${ratio * 100}%`;
-    }
 
     // 시간 텍스트
     const elapsed = scanOverallTimer; // 실제 흐른 초
@@ -757,21 +761,28 @@ function updateProgress() {
     remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
     statusTimerEl.textContent = formatTime(elapsed);
 
-    // 🔹 구간 → step index (0~3)
-    const stepIdx = Math.min(
-      SCAN_STEP_COUNT - 1,
-      Math.floor(ratio * SCAN_STEP_COUNT)
-    );
+    // 🔹 ratio(0~1)를 4구간(0~4)로 변환
+    const raw = ratio * SCAN_STEP_COUNT; // 0~4
 
+    // 현재 "문장 단계" index (0~3)
+    const stepIdx = Math.min(SCAN_STEP_COUNT - 1, Math.floor(raw));
+
+    // ✅ 완료된 구간 개수(0~4): 체크 + 로딩바 둘 다 이걸 기준으로
+    const completedCount = Math.min(SCAN_STEP_COUNT, Math.floor(raw));
+
+    // ✅ 로딩바는 "완료된 구간" 기준으로만 채움 (0%,25%,50%,75%,100%)
+    if (scanSequenceProgressInnerEl) {
+      const barRatio = completedCount / SCAN_STEP_COUNT;
+      scanSequenceProgressInnerEl.style.width = `${barRatio * 100}%`;
+    }
+
+    // ✅ 단계가 바뀌는 순간에만 문장/체크 갱신
     if (stepIdx !== currentScanStep) {
-      // 경계(1/4, 2/4, 3/4, 4/4)를 막 넘어간 순간에만 체크/문장 갱신
-      updateScanStepUI(stepIdx);
+      updateScanStepUI(stepIdx, completedCount);
     }
   } else {
     // 스캔 안 할 때: 단계 UI 숨김
     updateScanStepUI(-1);
-    // 바는 유지하고 싶으면 이 줄은 주석 처리
-    // progressBarInnerEl.style.width = "0%";
   }
 }
 
@@ -1124,6 +1135,15 @@ function renderAnalysisResult() {
     B: "#eab308", // 노랑
     C: "#ef4444", // 빨강
   };
+
+  // 등급별 장 이미지 선택
+  if (gutImageEl) {
+    let imgPath = "assets/img/gut-neutral.png";
+    if (overallGrade === "A") imgPath = "assets/img/gut-good.png";
+    else if (overallGrade === "C") imgPath = "assets/img/gut-bad.png";
+    gutImageEl.src = imgPath;
+  }
+
   const gradeColor = gradeColorMap[overallGrade];
 
   // 등급별 한줄 상태 문장
@@ -1652,3 +1672,29 @@ standbyScreenEl.addEventListener("click", () => {
     updateProgress();
   }
 });
+
+// -----------------------------
+// POSTURE 화면 터치 → 바로 스캔 시작(A1-2)
+// -----------------------------
+if (postureEl) {
+  postureEl.addEventListener("click", () => {
+    // 다른 phase에서는 무시
+    if (currentPhase !== "POSTURE") return;
+
+    // POSTURE용 타이머/애니메이션 정리
+    postureTimers.forEach(clearTimeout);
+    postureTimers = [];
+    if (postureProgressInner) {
+      postureProgressInner.style.width = "0%";
+    }
+
+    // 스캔 타이머/정제율 초기화
+    scanTimer = 0;
+    scanOverallTimer = 0;
+    purity = 0;
+
+    // 바로 스캔 phase로 점프
+    setPhase("A1-2");
+    updateProgress();
+  });
+}

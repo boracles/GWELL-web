@@ -182,20 +182,24 @@
               style="display: none"
             ></div>
 
-            <!-- 경고 / 결과 위쪽 or 결과 바로 위 -->
-            <div class="scan-result-gut" id="gutVisual" style="display: none">
-              <img
-                id="gutImage"
-                src="assets/img/gut-neutral.png"
-                alt="장 상태 시각화"
-              />
-            </div>
-
+            <!-- 결과 레이아웃: 왼쪽 장 이미지 + 오른쪽 결과 텍스트 -->
             <div
-              class="scan-result-list"
-              id="resultList"
+              class="scan-result-layout"
+              id="scanResultLayout"
               style="display: none"
-            ></div>
+            >
+              <!-- 왼쪽: 장 이미지 -->
+              <div class="scan-result-gut" id="gutVisual">
+                <img
+                  id="gutImage"
+                  src="assets/img/gut-neutral.png"
+                  alt="장 상태 시각화"
+                />
+              </div>
+
+              <!-- 오른쪽: JS에서 채우는 결과 텍스트 -->
+              <div class="scan-result-list" id="resultList"></div>
+            </div>
 
             <!-- 하단: 진행/정제율/버튼 -->
             <div class="scan-bottom" id="scanBottom">
