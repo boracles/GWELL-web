@@ -32,6 +32,9 @@ const scanStepEls = document.querySelectorAll(".scan-step[data-scan-step]");
 
 const standbyShaderCanvas = document.getElementById("standbyShader");
 
+const progressRowEl = document.getElementById("progressRow");
+const purityRowEl = document.getElementById("purityRow");
+
 const scanSequenceProgressInnerEl = document.getElementById(
   "scanSequenceProgressInner"
 );
@@ -88,19 +91,14 @@ const standbyFragmentShader = `
   void main() {
     vec2 uv = vUv;
 
-    // 세로/가로로 겹치는 파동
-    float wave1 = sin(uv.y * 5.0 + u_time * 1.2) * 0.015;
-    float wave2 = sin(uv.x * 7.0 - u_time * 1.0) * 0.01;
-
-    // 약간 더 유기적으로
-    float wave3 = sin((uv.x + uv.y) * 8.0 + u_time * 0.8) * 0.008;
+    // 세로/가로로 겹치는 파동 (강도 ↑)
+    float wave1 = sin(uv.y * 5.0 + u_time * 1.2) * 0.04;
+    float wave2 = sin(uv.x * 7.0 - u_time * 1.0) * 0.03;
+    float wave3 = sin((uv.x + uv.y) * 8.0 + u_time * 0.8) * 0.02;
 
     uv.x += wave1 + wave2 + wave3;
 
     vec4 color = texture2D(u_texture, uv);
-
-    // 살짝 어둡게/보라톤 살리기 (원하면 조절)
-    color.rgb *= 1.05;
 
     gl_FragColor = color;
   }
@@ -442,6 +440,16 @@ function setPhase(phase) {
   if (currentPhase === phase) return;
   currentPhase = phase;
 
+  // 🔹 결과 화면(C2)일 때만 body에 result-mode 클래스 붙이기
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("result-mode", phase === "C2");
+  }
+
+  // 🔹 기본값: 중앙 문구는 숨겨둔다 (필요한 phase에서만 켜기)
+  if (scanMainMessageEl) {
+    scanMainMessageEl.style.display = "none";
+  }
+
   if (metaContainerEl) {
     metaContainerEl.style.display = phase === "C2" ? "flex" : "none";
   }
@@ -469,6 +477,14 @@ function setPhase(phase) {
   }
   if (scanSequenceEl) {
     scanSequenceEl.style.display = isScanProgressPhase ? "block" : "none";
+  }
+
+  // 🔹 여기 추가
+  if (progressRowEl) {
+    progressRowEl.style.display = isScanProgressPhase ? "flex" : "none";
+  }
+  if (purityRowEl) {
+    purityRowEl.style.display = isScanProgressPhase ? "flex" : "none";
   }
 
   if (isStandby) {
@@ -507,10 +523,13 @@ function setPhase(phase) {
     case "A0-1":
       if (standbyHintEl) standbyHintEl.style.display = "block";
       if (statusSystemEl) statusSystemEl.textContent = "IDLE";
-      mainMessageEl.textContent = "장내자산관리공단입니다.";
-      subMessageEl.textContent = "관람객 접근을 기다리고 있습니다.";
-      secondaryMessageEl.textContent =
-        "변기 근처에 다가오면 시스템이 깨어납니다.";
+
+      // 🔹 중앙 문구는 완전히 숨김
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
+      mainMessageEl.textContent = "";
+      subMessageEl.textContent = "";
+      secondaryMessageEl.textContent = "";
+
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.25;
       progressLabelEl.textContent = "스캔 대기";
@@ -519,15 +538,17 @@ function setPhase(phase) {
       showMicrobes(false);
 
       resetScanSteps();
-
       break;
 
     case "A0-2":
       if (statusSystemEl) statusSystemEl.textContent = "READY";
-      mainMessageEl.textContent = "착석 시 스캔 절차가 시작됩니다.";
-      subMessageEl.textContent = "몇 초간 안정된 자세를 유지해 주세요.";
-      secondaryMessageEl.textContent =
-        "장내자산관리공단입니다. 착석하시면 장내 데이터 스캔이 시작됩니다.";
+
+      // 🔹 여기서도 중앙 문구 숨김
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
+      mainMessageEl.textContent = "";
+      subMessageEl.textContent = "";
+      secondaryMessageEl.textContent = "";
+
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.45;
 
@@ -601,7 +622,7 @@ function setPhase(phase) {
         postureLine4El.style.display = "block";
         postureLine4El.style.opacity = 1;
         postureLine4El.textContent =
-          "잠시 동안 이 자세를 유지하면 스캔이 자동으로 시작됩니다.";
+          "잠시 동안 이 자세를 유지하면 장내 데이터 스캔이 자동으로 시작됩니다.";
       }
 
       function pumpSVG(stepIndex) {
@@ -732,7 +753,7 @@ function setPhase(phase) {
 
       if (postureEl) postureEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "flex";
-      if (scanMainMessageEl) scanMainMessageEl.style.display = "block";
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "block"; // 🔹 이 줄 추가
       if (sensorSimEl) sensorSimEl.style.display = "flex";
 
       mainMessageEl.textContent = "초기 상태를 측정하고 있습니다.";
@@ -746,6 +767,8 @@ function setPhase(phase) {
       scanTotal = 30;
       purity = 0;
       updateProgress();
+
+      positionScanSteps();
 
       microProgress = 0.25;
       showMicrobes(true);
@@ -871,7 +894,6 @@ function updateSensorStatus() {
 // 진행바 업데이트 + 스캔 단계 연동
 // -----------------------------
 function updateProgress() {
-  // 정제율 텍스트
   if (purityValueEl) {
     purityValueEl.textContent = `${Math.round(purity)}%`;
   }
@@ -888,10 +910,16 @@ function updateProgress() {
   }
 
   if (isScanPhase) {
-    // 🔹 0~1 구간: 정제율 기준
-    const ratio = Math.min(1, Math.max(0, purity / 100));
+    // 🔹 정제율(0~1) – 텍스트용
+    const purityRatio = Math.min(1, Math.max(0, purity / 100));
 
-    // ⏱ 시간 텍스트는 기존처럼 scanOverallTimer 기준
+    // 🔹 전체 스캔 시간 비율(0~1) – 로딩바/단계용 (절대 후퇴 안 함)
+    const timeRatio = Math.min(
+      1,
+      Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
+    );
+
+    // ⏱ 시간 텍스트는 scanOverallTimer 기준
     const elapsed = scanOverallTimer;
     const total = SCAN_OVERALL_TOTAL;
     progressTimeEl.textContent = `${formatTime(elapsed)} / ${formatTime(
@@ -901,29 +929,27 @@ function updateProgress() {
     remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
     statusTimerEl.textContent = formatTime(elapsed);
 
-    // ✅ 로딩바는 항상 부드럽게 채우기
+    // ✅ 로딩바는 시간 기준으로만 부드럽게 증가 (절대 줄어들지 않음)
     if (scanSequenceProgressInnerEl) {
-      scanSequenceProgressInnerEl.style.width = `${ratio * 100}%`;
+      scanSequenceProgressInnerEl.style.width = `${timeRatio * 100}%`;
     }
 
-    // 🔹 0~1 구간: 전체 스캔 시간 비율
-    const timeRatio = Math.min(
-      1,
-      Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
-    );
-
-    // 🔹 문장(stepIdx) — 총 4문장 (0~3)
+    // ✅ "문장" 단계: 현재 구간
+    //   0~24%   → 0번 문장
+    //   25~49%  → 1번 문장
+    //   50~74%  → 2번 문장
+    //   75~100% → 3번 문장
     let stepIdx = 0;
     if (timeRatio >= 0.25) stepIdx = 1;
     if (timeRatio >= 0.5) stepIdx = 2;
     if (timeRatio >= 0.75) stepIdx = 3;
 
-    // 🔹 체크(completedCount)
-    //   0~24% → 0개
-    //   25~49% → 1개
-    //   50~74% → 2개
-    //   75~99% → 3개
-    //   100% → 4개
+    // ✅ "완료된 체크" 개수
+    //   0~24%   → 0개
+    //   25~49%  → 1개
+    //   50~74%  → 2개
+    //   75~99%  → 3개
+    //   100%    → 4개
     let completedCount = 0;
     if (timeRatio >= 0.25) completedCount = 1;
     if (timeRatio >= 0.5) completedCount = 2;
@@ -1750,6 +1776,8 @@ if (debugStartBtn) {
     scanOverallTimer = 0;
     scanRunning = false;
 
+    testTriggered = false;
+
     updateSensorStatus();
     setPhase("A0-1");
   });
@@ -1776,6 +1804,8 @@ if (btnReset) {
     microProgress = 0;
     scanResultStarted = false;
     scanRunning = false;
+
+    testTriggered = false;
 
     updateSensorStatus();
     setPhase("A0-1");

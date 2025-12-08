@@ -192,12 +192,12 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-bottom: constant(safe-area-inset-bottom);
 
-  background: radial-gradient(
-    circle at top,
-    #6a3bd4 0,
-    #39146b 40%,
-    #150322 75%
-  );
+  /* 🔹 전체 배경을 standby.png로 */
+  background-image: url("../img/Standby.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #000000; /* 로딩 전 깜빡임 방지용 */
 
   display: flex;
   flex-direction: column;
@@ -254,11 +254,8 @@ body {
 .standby-bg {
   position: absolute;
   inset: 0;
-  background-image: url("../img/Standby.jpg");
-  background-size: cover;
-  background-position: center;
-  filter: blur(2px);
-  transform: scale(1.02);
+  /* 🔹 셰이더가 배경을 대신할 거라 이미지/블러 제거 */
+  background: transparent;
 }
 
 /* 파티클 캔버스 */
@@ -524,10 +521,10 @@ body {
 }
 
 .posture-graphic {
-  width: 32%;
-  margin-top: 40px;
-  max-width: 360px;
-  margin-bottom: 40px;
+  width: 24%; /* 32% → 24% : SVG 더 작게 */
+  max-width: 280px; /* 360 → 280 */
+  margin-top: 40px; /* 조금 위로 */
+  margin-bottom: 32px; /* 아래 여백 줄이기 → 전체 그룹이 위로 올라감 */
 }
 
 .posture-svg {
@@ -566,6 +563,7 @@ body {
 
 .scan-main-message {
   margin-top: 12px;
+  display: none;
 }
 
 .scan-main-message h2 {
@@ -593,21 +591,16 @@ body {
   transition: opacity 0.3s ease;
 }
 
-/* 스캔 하단 로딩바를 화면 맨 아래에 고정 */
 .scan-bottom {
-  position: fixed; /* ✅ 이제 부모 말고 화면 기준 */
+  position: fixed;
   left: 16px;
   right: 16px;
   bottom: calc(env(safe-area-inset-bottom) + 16px);
-  /* safe area 때문에 아이패드 홈 인디케이터 위로 16px 띄움 */
-
-  display: flex;
+  display: none; /* 🔹 기본은 완전 숨김 */
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  z-index: 20; /* 미생물/배경보다 위에 나오게 */
-
-  /* 버튼 눌려야 하니까 pointer-events는 그대로 둔다 (기본 auto) */
+  z-index: 20;
 }
 
 .scan-bg.particles {
@@ -638,7 +631,7 @@ body {
 ========================== */
 
 .scan-sequence {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
 }
 
@@ -651,12 +644,12 @@ body {
 .scan-sequence-stepper {
   position: relative;
   width: 100%;
+  margin-top: 0; /* 전체를 약간 위로 */
 }
 
-/* 로딩바 (지금은 progressBarInnerEl를 메인으로 쓰지만,
-   시각적으로는 이 바 위에 점을 올려둘 수 있음) */
+/* 🔹 로딩바: 더 두껍게 */
 .scan-sequence-progress-bar {
-  height: 6px;
+  height: 12px; /* 6px → 12px */
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.85);
   overflow: hidden;
@@ -669,7 +662,7 @@ body {
   transition: width 0.3s ease;
 }
 
-/* 점들을 로딩바 위에 올려놓기 (flex 지우기!) */
+/* 🔹 점들을 로딩바 위에 올려놓기 */
 .scan-sequence-dots {
   position: absolute;
   top: 50%;
@@ -680,38 +673,36 @@ body {
   pointer-events: none;
 }
 
-/* 각 점을 left: XX% 로 직접 위치시킬 거라 absolute */
+/* 🔹 동그라미: 기본은 회색, 항상 보이게 & 좀 더 크게 */
 .scan-step {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  transform: translateX(-50%); /* 점의 중심을 bar 위에 맞추기 */
+  width: 22px; /* 12px → 22px */
+  height: 22px;
   top: 50%;
-  outline: 1px solid red !important; /*디버깅용*/
+  transform: translate(-50%, -50%); /* 바 중앙에 정확히 얹기 */
 }
 
 .scan-step-dot {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  /* 🔴 기본 상태에서는 완전히 숨김 */
-  border: 2px solid transparent;
-  background: transparent;
+  border: 2px solid rgba(148, 163, 184, 0.9); /* 회색 테두리 */
+  background: rgba(15, 23, 42, 0.95); /* 어두운 회색 배경 */
 }
 
-/* 체크 */
+/* 체크 아이콘 */
 .scan-step-check {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 
-/* JS에서 .completed 붙어 있는 칸만 체크 보이게 */
+/* 🔹 JS에서 .completed 붙은 구간만 초록으로 채우기 */
 .scan-step.completed .scan-step-dot {
   border-color: #22c55e;
   background: #22c55e;
@@ -1335,17 +1326,18 @@ body {
 ========================== */
 
 .posture-stepper {
-  margin-top: 32px;
+  margin-top: 24px;
   width: 40%;
   max-width: 420px;
   min-width: 260px;
+  position: relative; /* 🔹 점을 바 위에 겹치기 위해 */
 }
 
 .posture-progress-bar {
   position: relative;
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.8);
+  background: rgba(18, 12, 26, 1);
   overflow: hidden;
 }
 
@@ -1357,32 +1349,34 @@ body {
   transition: width 0.6s ease;
 }
 
-.posture-stepper-dots {
-  margin-top: 6px;
-  display: flex;
-  justify-content: space-between;
-}
-
 .posture-step {
-  position: relative;
-  width: 16px;
-  height: 16px;
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  top: 50%;
+  transform: translate(-50%, -90%); /* 바 중앙에 정확히 얹기 */
 }
 
 .posture-step-dot {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  border: 2px solid rgba(148, 163, 184, 0.7);
-  background: rgba(15, 23, 42, 0.9);
+  border: none;
+  background: rgba(18, 12, 26, 1); /* 기본 어두운 회색 배경 */
 }
 
 .posture-step-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
-/* 완료된 스텝 */
+/* ✅ 완료된 스텝만 초록으로 채우기 */
 .posture-step.completed .posture-step-dot {
   border-color: #22c55e;
   background: #22c55e;
@@ -1394,28 +1388,33 @@ body {
 
 .posture-stepper-dots {
   margin-top: 6px;
+  transform: translateY(-40%);
   display: flex;
   justify-content: space-between;
 }
-
-.posture-step {
-  position: relative;
-  width: 16px;
-  height: 16px;
+/* 시작 더미 점: 막대 맨 왼쪽 */
+.posture-step--start {
+  position: absolute;
+  left: 0%;
 }
 
-.posture-step-dot {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  border: 2px solid rgba(148, 163, 184, 0.7);
-  background: rgba(15, 23, 42, 0.9);
+/* 1,2,3,4단계 실제 점들 */
+.posture-step[data-step="0"] {
+  left: 25%;
+}
+.posture-step[data-step="1"] {
+  left: 50%;
+}
+.posture-step[data-step="2"] {
+  left: 75%;
+}
+.posture-step[data-step="3"] {
+  left: 100%;
 }
 
 .posture-step-check {
   position: absolute;
   inset: 0;
-  display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
@@ -1437,11 +1436,6 @@ body {
 .posture-step--start .posture-step-dot {
   border-color: transparent;
   background: transparent;
-}
-
-/* 혹시라도 체크가 들어가도 무조건 숨기기 */
-.posture-step--start .posture-step-check {
-  display: none !important;
 }
 
 /* 시작 포인트: 동그라미도 연해지게 or 완전 숨기고 싶으면 이렇게 */
@@ -1935,6 +1929,25 @@ section {
 /* ==========================
    글로벌 상단 로고 레이어 (Standby & Scan 공통)
 ========================== */
+
+/* 결과 화면(C2)일 때 상단 바 아래 얇은 선 */
+body.result-mode .global-logo-layer::after {
+  content: "";
+  position: absolute;
+  left: 24px;
+  right: 24px;
+
+  /* 로고 + padding 높이만큼 아래로 내려서 ‘아래쪽에’ 선을 그린다 */
+  top: 76px; /* 16px padding + 56px logo + 여유 4px */
+
+  height: 1px;
+  background: #f2e6dd;
+}
+
+body.result-mode .scan-root {
+  padding-top: 500px; /* 필요하면 100~140 사이로 직접 조정해봐 */
+}
+
 .global-logo-layer {
   position: fixed;
   top: 0;
