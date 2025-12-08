@@ -513,20 +513,23 @@ body {
 
 .scan-result-layout {
   display: grid;
-  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 520px minmax(0, 1fr); /* 🔸 왼쪽 컬럼 넓게 */
+  gap: 48px;
   align-items: flex-start;
-  margin-top: 16px;
+  margin-top: 24px; /* 🔸 위쪽 여백도 살짝 늘리기 */
 }
 
 .scan-result-gut {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start; /* 🔸 왼쪽 정렬 */
+  align-items: flex-start; /* 🔸 위쪽 정렬 */
+  padding-left: 24px; /* 🔸 왼쪽 여백 */
+  padding-top: 24px; /* 🔸 위쪽 여백 */
 }
 
 .scan-result-gut img {
-  max-width: 100%;
+  width: 100%;
+  max-width: 1200px; /* 🔸 이미지 최대 크기 키우기 (원하면 450까지 올려도 됨) */
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5));
@@ -570,7 +573,7 @@ body {
   align-items: center;
   justify-content: center;
 
-  margin-top: 40px;
+  margin-top: 28px;
   margin-bottom: 32px;
 }
 
@@ -589,9 +592,11 @@ body {
 }
 
 .posture-message {
-  font-size: 40px;
+  font-size: 28px; /* 👈 원하는 크기 */
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 0px;
+  color: #753a0c; /* 👈 색상도 여기서 넣는 게 가장 깔끔함 */
+  font-family: "Sweet", sans-serif; /* 👈 필요 시 추가 */
 }
 
 .posture-img {
@@ -1389,7 +1394,7 @@ body {
   width: 50%;
   max-width: 420px;
   min-width: 260px;
-  margin: 32px auto 0 auto; /* 🔥 위로 24px 여백 확보 */
+  margin: 24px auto 0 auto;
   position: relative;
 }
 
@@ -1485,13 +1490,13 @@ body {
 
 #postureSequenceText {
   font-family: "Sweet", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  font-size: 32px; /* 4줄 문장 크기 */
-  font-weight: 800; /* SUITE ExtraBold */
-  color: #120c1a; /* 네가 원한 색 */
+  font-size: 32px;
+  font-weight: 900; /* 최대 두께 */
+  color: #120c1a; /* ← 원하는 정확한 색 */
   opacity: 0;
   transition: opacity 0.5s ease;
   min-height: 36px;
-  margin-bottom: 10px;
+  margin-bottom: 0px;
 }
 
 /* ==========================
@@ -1964,16 +1969,12 @@ section {
    글로벌 상단 로고 레이어 (Standby & Scan 공통)
 ========================== */
 
-/* 결과 화면(C2)일 때 상단 바 아래 얇은 선 */
 body.result-mode .global-logo-layer::after {
   content: "";
   position: absolute;
   left: 28px;
   right: 28px;
-
-  /* 로고 아래로 충분히 내림 */
-  top: 88px; /* 16(px 패딩) + 56(px 로고) + 여유 16px 정도 */
-
+  top: 88px;
   height: 1px;
   background: #f2e6dd;
 }
@@ -1987,14 +1988,11 @@ body.result-mode .scan-root {
   top: 0;
   left: 0;
   right: 0;
-
   height: auto;
-  padding: 16px 28px 2px 28px;
-
-  display: flex; /* ✅ 왼쪽: 메타 / 오른쪽: 로고 */
+  padding: 18px 28px 2px 28px;
+  display: flex; /* 왼쪽: 메타 / 오른쪽: 로고 */
   justify-content: space-between;
   align-items: flex-start;
-
   z-index: 2000;
   pointer-events: none;
 }
@@ -2003,11 +2001,11 @@ body.result-mode .scan-root {
 .global-logo-meta {
   display: none;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   font-size: 18px;
   color: #f2e6dd;
   opacity: 0.9;
-  max-width: calc(100% - 180px); /* 오른쪽 로고 자리 확보 */
+  max-width: calc(100% - 180px); /* 오른쪽 로고 자리 */
 }
 
 /* 결과 화면(C2)일 때만 보이게 */
@@ -2015,14 +2013,30 @@ body.result-mode .global-logo-meta {
   display: flex;
 }
 
-/* 한 줄(위/아래) 전체를 4열 그리드로 맞추기 */
 .global-meta-line {
-  display: grid;
-  grid-template-columns: 72px 180px 150px auto;
-  /* 1: ID/스캔일 라벨, 2: ID/날짜 값,
-     3: 상태/등급 라벨, 4: 상태/등급 값 */
-  column-gap: 12px;
+  display: flex;
   align-items: baseline;
+}
+
+.global-meta-line .meta-pair:first-child {
+  min-width: 360px; /* 필요하면 340~400 사이에서 숫자 조절해봐 */
+}
+.meta-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px; /* 라벨–값 사이 간격 */
+}
+
+/* 왼쪽 열 라벨(ID / 스캔일) 가로폭 동일 */
+.global-meta-line .meta-pair:first-child .meta-label {
+  display: inline-block;
+  min-width: 72px; /* ID / 스캔일 라벨 폭 */
+}
+
+/* 오른쪽 열 라벨(장내 생태 상태 / 데이터 처리 등급) 가로폭 동일 */
+.global-meta-line .meta-pair:last-child .meta-label {
+  display: inline-block;
+  min-width: 150px; /* 상태/등급 라벨 폭 */
 }
 
 /* 각 컬럼은 세로 정렬 */

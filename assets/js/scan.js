@@ -611,14 +611,13 @@ function setPhase(phase) {
         postureGraphicEl.style.opacity = 1;
       }
       if (postureTitleEl) {
+        postureTitleEl.textContent = "올바른 자세로 앉아 주세요.";
+        postureTitleEl.style.color = "#753A0C"; // 원하는 폰트 색
         postureTitleEl.style.display = "block";
         postureTitleEl.style.opacity = 1;
       }
       if (postureLine4El) {
-        postureLine4El.style.display = "block";
-        postureLine4El.style.opacity = 1;
-        postureLine4El.textContent =
-          "잠시 동안 이 자세를 유지하면 장내 데이터 스캔이 자동으로 시작됩니다.";
+        postureLine4El.style.display = "none"; // 숨기기
       }
 
       function pumpSVG(stepIndex) {
@@ -715,27 +714,49 @@ function setPhase(phase) {
 
               if (idx === lastIndex) {
                 const afterFullTimer = setTimeout(() => {
+                  // 인포그래픽/스텝퍼/제목 서서히 숨기기
                   if (postureGraphicEl) postureGraphicEl.style.display = "none";
                   if (stepperEl) stepperEl.style.opacity = 0;
                   if (postureTitleEl) postureTitleEl.style.opacity = 0;
                   if (postureLine4El) postureLine4El.style.opacity = 0;
 
-                  seqText.style.opacity = 0;
-                  const showDetectTimer = setTimeout(() => {
+                  // ✅ 바로 이전 문장은 완전히 지워버리고, 감지 문장만 세팅
+                  if (seqText) {
+                    seqText.style.transition = "none"; // 트랜지션 잠시 꺼두고
+                    seqText.style.opacity = 0;
                     seqText.innerText =
                       "장내 배출 데이터가 감지되었습니다. 장내 데이터 정렬을 시작합니다.";
-                    seqText.style.opacity = 1;
-                  }, 400);
-                  postureTimers.push(showDetectTimer);
+                  }
 
+                  // ✅ 이 타이밍에 3D 미생물 켜기
+                  showMicrobes(true);
+                  if (scanMicrobesCanvas) {
+                    scanMicrobesCanvas.style.transition = "opacity 1s ease";
+                    scanMicrobesCanvas.style.opacity = 0.45; // 필요하면 0.3~0.6 사이로 조절
+                  }
+
+                  // 감지 문장만 부드럽게 페이드 인
+                  if (seqText) {
+                    requestAnimationFrame(() => {
+                      seqText.style.transition = "opacity 0.5s ease";
+                      seqText.style.opacity = 1;
+                    });
+                  }
+
+                  // 잠시 감지 문장 보여 준 뒤 스캔 Phase로 진입
                   const toScanTimer = setTimeout(() => {
-                    goToScanPhase();
-                  }, 3400);
+                    setPhase("A1-2");
+                    scanTimer = 0;
+                    purity = 0;
+                    updateProgress();
+                  }, 3400); // 3.4초 정도 감지 문장 유지 (원래 네가 쓰던 값)
+
                   postureTimers.push(toScanTimer);
                 }, 800);
 
                 postureTimers.push(afterFullTimer);
               } else {
+                // 👇 나머지 단계(0,1,2)는 기존 로직 그대로 유지
                 const tFadeOut = setTimeout(() => {
                   seqText.style.opacity = 0;
                   const tNext = setTimeout(() => {
@@ -1021,8 +1042,8 @@ function initMicrobeScene() {
   microCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
   microCamera.position.set(0, 0, 55);
 
-  const amb = new THREE.AmbientLight(0xffffff, 0.7);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  const amb = new THREE.AmbientLight(0xffffff, 0.6);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
   dir.position.set(5, 10, 7);
   microScene.add(amb, dir);
 
@@ -1031,6 +1052,39 @@ function initMicrobeScene() {
   microScene.add(microGroup);
 
   const loader = new window.GLTFLoader();
+
+  const texLoader = new THREE.TextureLoader();
+
+  // 🎨 알베도(A)
+  const colorMaps = [
+    texLoader.load("assets/img/1_A.png"),
+    texLoader.load("assets/img/2_A.png"),
+    texLoader.load("assets/img/3_A.png"),
+    texLoader.load("assets/img/4_A.png"),
+  ];
+
+  // ✨ Emission(E)
+  const emissiveMaps = [
+    texLoader.load("assets/img/1_E.png"),
+    texLoader.load("assets/img/2_E.png"),
+    texLoader.load("assets/img/3_E.png"),
+    texLoader.load("assets/img/4_E.png"),
+  ];
+
+  // 🔹 Normal(N) (없으면 알아서 null)
+  const normalMaps = [
+    texLoader.load("assets/img/1_N.png"),
+    texLoader.load("assets/img/2_N.png"),
+    texLoader.load("assets/img/3_N.png"),
+    texLoader.load("assets/img/4_N.png"),
+  ];
+
+  // 텍스처 색공간을 sRGB로 (채도/명도 살리기)
+  [...colorMaps, ...emissiveMaps].forEach((tex) => {
+    if (!tex) return;
+    if (tex.encoding !== undefined) tex.encoding = THREE.sRGBEncoding; // old
+    if (tex.colorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace; // new
+  });
 
   const loadPromises = MICRO_MODEL_PATHS.map(
     (path) =>
@@ -1046,10 +1100,47 @@ function initMicrobeScene() {
 
   Promise.all(loadPromises)
     .then((scenes) => {
+      // 🔥 각 Microbiome_n.glb 에 대응하는 채도 높은 머티리얼 입히기
+      scenes.forEach((scene, index) => {
+        const colorMap = colorMaps[index] || null;
+        const emissiveMap = emissiveMaps[index] || null;
+        const normalMap = normalMaps[index] || null;
+
+        scene.traverse((obj) => {
+          if (!obj.isMesh) return;
+
+          const matParams = {
+            map: colorMap || null,
+            metalness: 0.0,
+            roughness: 0.35, // 조금 더 반짝이게
+            transparent: true,
+            side: THREE.DoubleSide,
+          };
+
+          // Emission 텍스처 + 발광 색
+          if (emissiveMap) {
+            matParams.emissiveMap = emissiveMap;
+            matParams.emissive = new THREE.Color(0x9c5cff); // 보라빛 발광
+            matParams.emissiveIntensity = 4.8; // 🔼 채도/밝기 느낌
+          }
+
+          if (normalMap) {
+            matParams.normalMap = normalMap;
+          }
+
+          // 맵 전체에 약간 컬러 틴트 (채도 강화 느낌)
+          matParams.color = new THREE.Color(1.15, 1.1, 1.25); // RGB >1 가능
+
+          obj.material = new THREE.MeshStandardMaterial(matParams);
+        });
+      });
+
       const COUNT = 70;
 
       for (let i = 0; i < COUNT; i++) {
-        const baseScene = scenes[i % scenes.length].clone(true);
+        const modelIndex = i % scenes.length;
+        const baseScene = scenes[modelIndex].clone(true);
+
         const wrapper = new THREE.Group();
         wrapper.add(baseScene);
 
@@ -1109,7 +1200,11 @@ function animateMicrobes() {
   const t = (now - microStartTime) * 0.001;
 
   let targetProgress = 0;
-  if (currentPhase === "A1-2") {
+
+  if (currentPhase === "POSTURE") {
+    // 🔥 감지 문장 타이밍에 미생물이 보이게 하기 위한 값
+    targetProgress = 0.2; // 0.15~0.3 아무 값 OK (카메라 z도 살짝 전진)
+  } else if (currentPhase === "A1-2") {
     targetProgress = 0.25;
   } else if (currentPhase === "B1") {
     targetProgress = 0.45;
@@ -1460,191 +1555,212 @@ function renderAnalysisResult() {
     subMessageEl.textContent = actionLine;
   }
 
-  // === 오른쪽 결과 패널(장 이미지는 이미 왼쪽 캔버스에 따로 있음) ===
   resultListEl.style.display = "block";
   resultListEl.innerHTML = `
-    <div class="gut-layout-right-inner" style="display:flex; flex-direction:column; gap:16px;">
-      <!-- 한눈에 보는 결과 헤더 -->
-      <div style="
-        border-radius:16px;
-        padding:16px 18px;
-        background:rgba(248,250,252,0.95);
-        box-shadow:0 8px 20px rgba(15,23,42,0.06);
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-      ">
-        <div>
-          <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">
-            귀하의 장내 생태는
-          </div>
-          <div style="font-size:16px; font-weight:600; color:#111827; line-height:1.4;">
-            사회 적응도 <span style="color:${gradeColor};">${overallScoreText}</span>로 판정되었습니다.<br/>
-            <span style="font-size:13px; color:#4b5563;">${actionLine}</span>
-          </div>
+  <div class="gut-layout-right-inner"
+       style="display:flex; flex-direction:column; gap:16px; padding-top:24px;">
+    
+    <!-- 🔹 상단 종합 리포트 제목 -->
+    <div style="
+      align-self:flex-end;
+      font-size:13px;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      color:#6b7280;
+    ">
+      장내 생태 사회 적응도 종합 리포트
+    </div>
+
+    <!-- 한눈에 보는 결과 헤더 -->
+    <div style="
+      border-radius:16px;
+      padding:16px 18px;
+      background:rgba(248,250,252,0.95);
+      box-shadow:0 8px 20px rgba(15,23,42,0.06);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    ">
+      <div>
+        <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">
+          귀하의 장내 생태는
         </div>
-        <div style="
-          min-width:72px;
-          text-align:center;
-          padding:8px 10px;
-          border-radius:14px;
-          background:${gradeColor}1A;
-          border:1px solid ${gradeColor};
-        ">
-          <div style="font-size:11px; color:#4b5563; margin-bottom:2px;">등급</div>
-          <div style="font-size:22px; font-weight:700; color:${gradeColor};">
-            ${overallGrade}
-          </div>
+        <div style="font-size:16px; font-weight:600; color:#111827; line-height:1.4;">
+          사회 적응도 <span style="color:${gradeColor};">${overallScoreText}</span>로 판정되었습니다.<br/>
+          <span style="font-size:13px; color:#4b5563;">${actionLine}</span>
         </div>
       </div>
-
-      <!-- 세부 범주 5개 -->
       <div style="
-        display:grid;
-        grid-template-columns:repeat(2,minmax(0,1fr));
-        gap:14px;
+        min-width:72px;
+        text-align:center;
+        padding:8px 10px;
+        border-radius:14px;
+        background:${gradeColor}1A;
+        border:1px solid ${gradeColor};
       ">
-        <div style="
-          background:#ffffff;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:12px; font-weight:600; color:#111827;">
-              장내 다양성 & 정상성의 폭
-            </span>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${diversityGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-            D = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${diversityText}
-          </p>
-        </div>
-
-        <div style="
-          background:#ffffff;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:12px; font-weight:600; color:#111827;">
-              규범 적합도 (순응 점수)
-            </span>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${conformityGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-            B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
-    conformityScore
-  )}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${conformityText}
-          </p>
-        </div>
-
-        <div style="
-          background:#ffffff;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:12px; font-weight:600; color:#111827;">
-              공동체 결속 에너지 (SCFA)
-            </span>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${cohesionGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-            Bt = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${cohesionText}
-          </p>
-        </div>
-
-        <div style="
-          background:#ffffff;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:12px; font-weight:600; color:#111827;">
-              갈등·혐오 지수 (염증 로드)
-            </span>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${conflictGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-            L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
-    conflictScore
-  )}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${conflictText}
-          </p>
-        </div>
-
-        <div style="
-          background:#ffffff;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:12px; font-weight:600; color:#111827;">
-              사회적 생산성 / 효율성
-            </span>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${productivityGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-            EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${productivityText}
-          </p>
+        <div style="font-size:11px; color:#4b5563; margin-bottom:2px;">등급</div>
+        <div style="font-size:22px; font-weight:700; color:${gradeColor};">
+          ${overallGrade}
         </div>
       </div>
     </div>
-  `;
+
+    <!-- 세부 범주 5개 -->
+    <div style="
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;
+    ">
+      <div style="
+        background:#ffffff;
+        border-radius:14px;
+        padding:12px 14px;
+        box-shadow:0 6px 16px rgba(15,23,42,0.05);
+      ">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:600; color:#111827;">
+            장내 다양성 & 정상성의 폭
+          </span>
+          <span style="
+            font-size:11px;
+            font-weight:700;
+            padding:2px 8px;
+            border-radius:999px;
+            background:#eef2ff;
+            color:#4f46e5;
+          ">${diversityGrade}</span>
+        </div>
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+          D = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
+        </div>
+        <p style="font-size:11px; color:#4b5563; margin:0;">
+          ${diversityText}
+        </p>
+      </div>
+
+      <div style="
+        background:#ffffff;
+        border-radius:14px;
+        padding:12px 14px;
+        box-shadow:0 6px 16px rgba(15,23,42,0.05);
+      ">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:600; color:#111827;">
+            규범 적합도 (순응 점수)
+          </span>
+          <span style="
+            font-size:11px;
+            font-weight:700;
+            padding:2px 8px;
+            border-radius:999px;
+            background:#eef2ff;
+            color:#4f46e5;
+          ">${conformityGrade}</span>
+        </div>
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+          B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
+    conformityScore
+  )}
+        </div>
+        <p style="font-size:11px; color:#4b5563; margin:0;">
+          ${conformityText}
+        </p>
+      </div>
+
+      <div style="
+        background:#ffffff;
+        border-radius:14px;
+        padding:12px 14px;
+        box-shadow:0 6px 16px rgba(15,23,42,0.05);
+      ">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:600; color:#111827;">
+            공동체 결속 에너지 (SCFA)
+          </span>
+          <span style="
+            font-size:11px;
+            font-weight:700;
+            padding:2px 8px;
+            border-radius:999px;
+            background:#eef2ff;
+            color:#4f46e5;
+          ">${cohesionGrade}</span>
+        </div>
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+          Bt = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
+        </div>
+        <p style="font-size:11px; color:#4b5563; margin:0;">
+          ${cohesionText}
+        </p>
+      </div>
+
+      <div style="
+        background:#ffffff;
+        border-radius:14px;
+        padding:12px 14px;
+        box-shadow:0 6px 16px rgba(15,23,42,0.05);
+      ">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:600; color:#111827;">
+            갈등·혐오 지수 (염증 로드)
+          </span>
+          <span style="
+            font-size:11px;
+            font-weight:700;
+            padding:2px 8px;
+            border-radius:999px;
+            background:#eef2ff;
+            color:#4f46e5;
+          ">${conflictGrade}</span>
+        </div>
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+          L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
+    conflictScore
+  )}
+        </div>
+        <p style="font-size:11px; color:#4b5563; margin:0;">
+          ${conflictText}
+        </p>
+      </div>
+
+      <div style="
+        background:#ffffff;
+        border-radius:14px;
+        padding:12px 14px;
+        box-shadow:0 6px 16px rgba(15,23,42,0.05);
+      ">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:600; color:#111827;">
+            사회적 생산성 / 효율성
+          </span>
+          <span style="
+            font-size:11px;
+            font-weight:700;
+            padding:2px 8px;
+            border-radius:999px;
+            background:#eef2ff;
+            color:#4f46e5;
+          ">${productivityGrade}</span>
+        </div>
+        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
+          EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
+        </div>
+        <p style="font-size:11px; color:#4b5563; margin:0;">
+          ${productivityText}
+        </p>
+      </div>
+    </div>
+
+    <!-- 🔹 하단 설명 문장 -->
+    <div style="
+      margin-top:8px;
+      font-size:11px;
+      color:#6b7280;
+    ">
+      본 보고서는 귀하의 장내 생태 데이터를 기반으로 산출된 사회 적응 및 기여 지수를 포함합니다.
+    </div>
+  </div>
+`;
 }
 
 // -----------------------------

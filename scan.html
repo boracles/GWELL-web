@@ -44,27 +44,36 @@
     <script src="assets/js/scan.js" defer></script>
   </head>
   <body>
+    <!-- 🔹 상단 로고 + 결과 메타 바 -->
     <div class="global-logo-layer">
-      <!-- 🔹 결과지 메타 정보 (기본은 숨겨놓고 C2에서만 보이게 할 것) -->
+      <!-- 결과지 메타 정보 (C2에서만 보이게) -->
       <div class="global-logo-meta">
         <!-- 1줄: ID / 장내 생태 상태 -->
         <div class="global-meta-line">
-          <span class="meta-label meta-label--id">ID</span>
-          <span class="meta-value meta-value--id" id="metaId">--</span>
+          <div class="meta-pair">
+            <span class="meta-label">ID</span>
+            <span class="meta-value" id="metaId">--</span>
+          </div>
 
-          <span class="meta-label meta-label--status">장내 생태 상태</span>
-          <span class="meta-value meta-value--status" id="metaStatus">--</span>
+          <div class="meta-pair">
+            <span class="meta-label">장내 생태 상태</span>
+            <span class="meta-value meta-value--status" id="metaStatus"
+              >--</span
+            >
+          </div>
         </div>
 
         <!-- 2줄: 스캔일 / 데이터 처리 등급 -->
         <div class="global-meta-line">
-          <span class="meta-label meta-label--id">스캔일</span>
-          <span class="meta-value meta-value--id" id="metaDate">
-            ----년 --월 --일
-          </span>
+          <div class="meta-pair">
+            <span class="meta-label">스캔일</span>
+            <span class="meta-value" id="metaDate">----년 --월 --일</span>
+          </div>
 
-          <span class="meta-label meta-label--status">데이터 처리 등급</span>
-          <span class="meta-value meta-value--level" id="metaLevel">LV-</span>
+          <div class="meta-pair">
+            <span class="meta-label">데이터 처리 등급</span>
+            <span class="meta-value meta-value--level" id="metaLevel">LV-</span>
+          </div>
         </div>
       </div>
 
@@ -76,6 +85,7 @@
       />
     </div>
 
+    <!-- 🔹 여기서부터 원래 있던 app 그대로 -->
     <div class="app app--scan">
       <!-- Standby 화면: 파티클 + 힌트 한 줄 -->
       <div id="standbyScreen" class="standby-screen">
