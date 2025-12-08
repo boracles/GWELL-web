@@ -47,28 +47,24 @@
     <div class="global-logo-layer">
       <!-- 🔹 결과지 메타 정보 (기본은 숨겨놓고 C2에서만 보이게 할 것) -->
       <div class="global-logo-meta">
-        <!-- 왼쪽 세로 컬럼: 상태 / 등급 -->
-        <div class="meta-col meta-col--status">
-          <div class="global-meta-line">
-            장내 생태 상태 :
-            <span id="metaStatus">--</span>
-          </div>
-          <div class="global-meta-line">
-            데이터 처리 등급
-            <span id="metaLevel">LV-</span>
-          </div>
+        <!-- 1줄: ID / 장내 생태 상태 -->
+        <div class="global-meta-line">
+          <span class="meta-label meta-label--id">ID</span>
+          <span class="meta-value meta-value--id" id="metaId">--</span>
+
+          <span class="meta-label meta-label--status">장내 생태 상태</span>
+          <span class="meta-value meta-value--status" id="metaStatus">--</span>
         </div>
 
-        <!-- 오른쪽 세로 컬럼: ID / 스캔일 -->
-        <div class="meta-col meta-col--id">
-          <div class="global-meta-line">
-            ID
-            <span id="metaId">--</span>
-          </div>
-          <div class="global-meta-line">
-            스캔일
-            <span id="metaDate">----년 --월 --일</span>
-          </div>
+        <!-- 2줄: 스캔일 / 데이터 처리 등급 -->
+        <div class="global-meta-line">
+          <span class="meta-label meta-label--id">스캔일</span>
+          <span class="meta-value meta-value--id" id="metaDate">
+            ----년 --월 --일
+          </span>
+
+          <span class="meta-label meta-label--status">데이터 처리 등급</span>
+          <span class="meta-value meta-value--level" id="metaLevel">LV-</span>
         </div>
       </div>
 
@@ -127,7 +123,7 @@
               <!-- 인포그래픽 -->
               <div class="posture-graphic">
                 <img
-                  src="assets/img/Sit.svg"
+                  src="assets/img/Sit.png"
                   class="posture-img posture-img--idle"
                   id="postureImg"
                   alt="올바른 착석 자세 인포그래픽"
@@ -147,33 +143,28 @@
                   ></div>
                 </div>
                 <div class="posture-stepper-dots">
-                  <!-- 🔹 시작 지점: 공간만 차지, 실제 단계 아님 -->
-                  <div class="posture-step posture-step--start">
-                    <span class="posture-step-dot"></span>
-                  </div>
-
-                  <!-- 🔹 1단계 -->
+                  <!-- 1단계 -->
                   <div class="posture-step" data-step="0">
                     <span class="posture-step-dot"></span>
-                    <span class="posture-step-check">✔</span>
+                    <span class="posture-step-check">1</span>
                   </div>
 
-                  <!-- 🔹 2단계 -->
+                  <!-- 2단계 -->
                   <div class="posture-step" data-step="1">
                     <span class="posture-step-dot"></span>
-                    <span class="posture-step-check">✔</span>
+                    <span class="posture-step-check">2</span>
                   </div>
 
-                  <!-- 🔹 3단계 -->
+                  <!-- 3단계 -->
                   <div class="posture-step" data-step="2">
                     <span class="posture-step-dot"></span>
-                    <span class="posture-step-check">✔</span>
+                    <span class="posture-step-check">3</span>
                   </div>
 
-                  <!-- 🔹 4단계 -->
+                  <!-- 4단계 -->
                   <div class="posture-step" data-step="3">
                     <span class="posture-step-dot"></span>
-                    <span class="posture-step-check">✔</span>
+                    <span class="posture-step-check">4</span>
                   </div>
                 </div>
               </div>

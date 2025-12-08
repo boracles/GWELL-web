@@ -2,9 +2,16 @@
    기본 style.css
 ========================== */
 
-/* SUITE 폰트 적용 */
 @font-face {
-  font-family: "SUITE";
+  font-family: "Sweet";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-Light.woff2")
+    format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sweet";
   src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-Regular.woff2")
     format("woff2");
   font-weight: 400;
@@ -12,10 +19,42 @@
 }
 
 @font-face {
-  font-family: "SUITE";
+  font-family: "Sweet";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-Medium.woff2")
+    format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sweet";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-SemiBold.woff2")
+    format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sweet";
   src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-Bold.woff2")
     format("woff2");
   font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sweet";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-ExtraBold.woff2")
+    format("woff2");
+  font-weight: 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sweet";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-2@1.0/SUITE-Heavy.woff2")
+    format("woff2");
+  font-weight: 900;
   font-display: swap;
 }
 
@@ -46,7 +85,7 @@ body {
 }
 
 body {
-  font-family: "futura-pt", "SUITE", -apple-system, BlinkMacSystemFont,
+  font-family: "futura-pt", "Sweet", -apple-system, BlinkMacSystemFont,
     system-ui, sans-serif;
   color: #f2e6dd;
 }
@@ -521,10 +560,26 @@ body {
 }
 
 .posture-graphic {
-  width: 24%; /* 32% → 24% : SVG 더 작게 */
-  max-width: 280px; /* 360 → 280 */
-  margin-top: 40px; /* 조금 위로 */
-  margin-bottom: 32px; /* 아래 여백 줄이기 → 전체 그룹이 위로 올라감 */
+  width: 24%;
+  max-width: 280px;
+
+  /* 🔥 고정 높이: 두 이미지 중 더 큰 높이에 맞춰 지정 */
+  height: 400px; /* 필요하면 240~300px 사이로 조절 */
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-top: 40px;
+  margin-bottom: 32px;
+}
+
+.posture-graphic img.posture-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+
+  /* 숨쉬기 애니메이션 유지하고 있으면 그대로 놔둬도 됨 */
 }
 
 .posture-svg {
@@ -730,16 +785,21 @@ body {
 }
 
 .posture-sub {
-  font-size: 20px;
+  font-size: 30px;
   opacity: 0.9;
 }
 
 .posture-sub-soft {
-  margin-top: 4px;
-  font-size: 14px;
-  opacity: 0.8;
+  margin-top: 12px;
+  font-size: 15.5px;
+  opacity: 0.5;
 }
 
+#postureLine4 {
+  font-size: 15.4px; /* 18 → 14 같은 식으로 줄이기 */
+  font-weight: 400;
+  opacity: 0.6; /* 너무 튀면 조금 연하게 */
+}
 /* ==========================
    Scan 페이지
 ========================== */
@@ -1326,16 +1386,16 @@ body {
 ========================== */
 
 .posture-stepper {
-  margin-top: 24px;
-  width: 40%;
+  width: 50%;
   max-width: 420px;
   min-width: 260px;
-  position: relative; /* 🔹 점을 바 위에 겹치기 위해 */
+  margin: 32px auto 0 auto; /* 🔥 위로 24px 여백 확보 */
+  position: relative;
 }
 
 .posture-progress-bar {
   position: relative;
-  height: 8px;
+  height: 9px;
   border-radius: 999px;
   background: rgba(18, 12, 26, 1);
   overflow: hidden;
@@ -1345,7 +1405,7 @@ body {
   height: 100%;
   width: 0%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e, #a855f7, #38bdf8);
+  background: linear-gradient(90deg, #6d361a, #3b205c, #a58d80, #6d361a);
   transition: width 0.6s ease;
 }
 
@@ -1378,8 +1438,8 @@ body {
 
 /* ✅ 완료된 스텝만 초록으로 채우기 */
 .posture-step.completed .posture-step-dot {
-  border-color: #22c55e;
-  background: #22c55e;
+  border-color: #6d361a;
+  background: #6d361a;
 }
 
 .posture-step.completed .posture-step-check {
@@ -1392,21 +1452,16 @@ body {
   display: flex;
   justify-content: space-between;
 }
-/* 시작 더미 점: 막대 맨 왼쪽 */
-.posture-step--start {
-  position: absolute;
-  left: 0%;
-}
 
 /* 1,2,3,4단계 실제 점들 */
 .posture-step[data-step="0"] {
-  left: 25%;
+  left: 0%;
 }
 .posture-step[data-step="1"] {
-  left: 50%;
+  left: 33%;
 }
 .posture-step[data-step="2"] {
-  left: 75%;
+  left: 66%;
 }
 .posture-step[data-step="3"] {
   left: 100%;
@@ -1420,44 +1475,23 @@ body {
   font-size: 11px;
   opacity: 0;
   transition: opacity 0.3s ease;
+  font-weight: 700;
 }
 
-/* 완료된 스텝에서만 체크 표시 */
-.posture-step.completed .posture-step-dot {
-  border-color: #22c55e;
-  background: #22c55e;
-}
-
-.posture-step.completed .posture-step-check {
-  opacity: 1;
-}
-
-/* 🔹 시작 포인트: 점도 거의 안 보이게 (투명한 자리만) */
-.posture-step--start .posture-step-dot {
-  border-color: transparent;
-  background: transparent;
-}
-
-/* 시작 포인트: 동그라미도 연해지게 or 완전 숨기고 싶으면 이렇게 */
-.posture-step--start .posture-step-dot {
-  border-color: transparent;
-  background: transparent;
-}
-
-/* 시작 포인트에는 체크 자체가 아예 없음 (HTML에도 안 넣었지만, 혹시 대비) */
-.posture-step--start .posture-step-check {
-  display: none !important;
-}
-
-.posture-step.start .posture-step-check {
-  display: none !important;
+/* 시작 도트도 다른 점과 같은 스타일로 보이게 */
+.posture-step-dot {
+  background: rgba(18, 12, 26, 1);
 }
 
 #postureSequenceText {
-  font-size: 22px;
+  font-family: "Sweet", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 32px; /* 4줄 문장 크기 */
+  font-weight: 800; /* SUITE ExtraBold */
+  color: #120c1a; /* 네가 원한 색 */
   opacity: 0;
   transition: opacity 0.5s ease;
-  min-height: 28px; /* 높이 확보 → 문장 바뀌어도 layout 안밀림 */
+  min-height: 36px;
+  margin-bottom: 10px;
 }
 
 /* ==========================
@@ -1934,11 +1968,11 @@ section {
 body.result-mode .global-logo-layer::after {
   content: "";
   position: absolute;
-  left: 24px;
-  right: 24px;
+  left: 28px;
+  right: 28px;
 
-  /* 로고 + padding 높이만큼 아래로 내려서 ‘아래쪽에’ 선을 그린다 */
-  top: 76px; /* 16px padding + 56px logo + 여유 4px */
+  /* 로고 아래로 충분히 내림 */
+  top: 88px; /* 16(px 패딩) + 56(px 로고) + 여유 16px 정도 */
 
   height: 1px;
   background: #f2e6dd;
@@ -1955,20 +1989,40 @@ body.result-mode .scan-root {
   right: 0;
 
   height: auto;
-  padding: 16px 24px 0 24px;
+  padding: 16px 28px 2px 28px;
 
-  display: block; /* flex 제거 */
+  display: flex; /* ✅ 왼쪽: 메타 / 오른쪽: 로고 */
+  justify-content: space-between;
+  align-items: flex-start;
+
   z-index: 2000;
   pointer-events: none;
 }
 
+/* 기본: 숨김 + 공통 스타일 */
 .global-logo-meta {
   display: none;
-  flex-direction: row;
-  gap: 24px;
-  font-size: 12px;
-  color: #e5e7eb;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 18px;
+  color: #f2e6dd;
   opacity: 0.9;
+  max-width: calc(100% - 180px); /* 오른쪽 로고 자리 확보 */
+}
+
+/* 결과 화면(C2)일 때만 보이게 */
+body.result-mode .global-logo-meta {
+  display: flex;
+}
+
+/* 한 줄(위/아래) 전체를 4열 그리드로 맞추기 */
+.global-meta-line {
+  display: grid;
+  grid-template-columns: 72px 180px 150px auto;
+  /* 1: ID/스캔일 라벨, 2: ID/날짜 값,
+     3: 상태/등급 라벨, 4: 상태/등급 값 */
+  column-gap: 12px;
+  align-items: baseline;
 }
 
 /* 각 컬럼은 세로 정렬 */
@@ -1976,10 +2030,6 @@ body.result-mode .scan-root {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.global-meta-line {
-  line-height: 1.4;
 }
 
 .global-meta-line span {
@@ -1999,4 +2049,56 @@ body.result-mode .scan-root {
 
 .app-header--scan {
   display: none !important;
+}
+
+/* 결과 화면일 때, 전체 스캔 영역을 선 아래로 내리기 */
+body.result-mode #scanRoot {
+  padding-top: 80px; /* 원하는 만큼: 120~180 사이에서 조절 */
+}
+
+/* ========== 상단 결과 메타 바 ========== */
+
+.meta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-label {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.9;
+  /* 👉 여기는 너비/마진 따로 안 줌 */
+}
+
+.meta-label--id {
+  text-align: left;
+}
+.meta-label--status {
+  text-align: left;
+}
+
+/* 값 공통 */
+.meta-value {
+  font-size: 18px;
+  font-weight: 600;
+  /* 👉 margin-left 제거해서 grid에만 맡김 */
+}
+/* 상태 / 등급 값은 살짝 더 강조 */
+.meta-value--status,
+.meta-value--level {
+  font-weight: 700;
+}
+
+/* 상태 / 등급 색상 */
+.status-good {
+  color: #0d7c64; /* 안정, LV-A 계열 */
+}
+
+.status-warn {
+  color: #ffaa2b; /* 경계, LV-B 계열 */
+}
+
+.status-bad {
+  color: #80233b; /* 주의, LV-C 계열 */
 }

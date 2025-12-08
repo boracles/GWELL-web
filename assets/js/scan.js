@@ -450,10 +450,6 @@ function setPhase(phase) {
     scanMainMessageEl.style.display = "none";
   }
 
-  if (metaContainerEl) {
-    metaContainerEl.style.display = phase === "C2" ? "flex" : "none";
-  }
-
   if (statusPhaseEl) statusPhaseEl.textContent = phase;
   if (warningMessageEl) warningMessageEl.style.display = "none";
   if (resultListEl) resultListEl.style.display = "none";
@@ -679,6 +675,18 @@ function setPhase(phase) {
         const lastIndex = seq.length - 1;
         if (idx > lastIndex) return;
 
+        // 🔹 문장 인덱스에 따라 Sit / Sit2 변경
+        const img = document.getElementById("postureImg");
+        if (img) {
+          if (idx === 0 || idx === 1) {
+            // 1, 2번째 문장
+            img.src = "assets/img/Sit.png";
+          } else {
+            // 3, 4번째 문장
+            img.src = "assets/img/Sit2.png";
+          }
+        }
+
         seqText.innerText = seq[idx];
         seqText.style.opacity = 1;
 
@@ -688,12 +696,20 @@ function setPhase(phase) {
           const t2 = setTimeout(() => {
             const target = ((idx + 1) / seq.length) * 100;
 
+            // 🔹 1번 스텝(맨 왼쪽)은 "도트 + 숫자 → 바" 순서
+            if (idx === 0 && postureStepEls && postureStepEls[0]) {
+              const firstStep = postureStepEls[0];
+              firstStep.classList.add("completed");
+              const firstCheck = firstStep.querySelector(".posture-step-check");
+              if (firstCheck) firstCheck.style.opacity = "1";
+            }
+
             animateProgressTo(target, () => {
-              if (postureStepEls && postureStepEls[idx]) {
-                postureStepEls[idx].classList.add("completed");
-                const check = postureStepEls[idx].querySelector(
-                  ".posture-step-check"
-                );
+              // 🔹 2,3,4번 스텝은 "바 → 도트 + 숫자" 순서
+              if (idx > 0 && postureStepEls && postureStepEls[idx]) {
+                const stepEl = postureStepEls[idx];
+                stepEl.classList.add("completed");
+                const check = stepEl.querySelector(".posture-step-check");
                 if (check) check.style.opacity = "1";
               }
 
@@ -1411,6 +1427,28 @@ function renderAnalysisResult() {
 
   if (metaStatusEl) metaStatusEl.textContent = statusText;
   if (metaLevelEl) metaLevelEl.textContent = levelText;
+
+  // 👉 색상용 클래스 리셋
+  if (metaStatusEl) {
+    metaStatusEl.classList.remove("status-good", "status-warn", "status-bad");
+  }
+  if (metaLevelEl) {
+    metaLevelEl.classList.remove("status-good", "status-warn", "status-bad");
+  }
+
+  // 👉 전체 등급(overallGrade)에 따라 색상 결정
+  let statusClass = "status-warn"; // 기본: B = 경계
+
+  if (overallGrade === "A") {
+    statusClass = "status-good";
+  } else if (overallGrade === "C") {
+    statusClass = "status-bad";
+  }
+
+  // 👉 장내 생태 상태 / 데이터 처리 등급에 색 적용
+  if (metaStatusEl) metaStatusEl.classList.add(statusClass);
+  if (metaLevelEl) metaLevelEl.classList.add(statusClass);
+
   if (metaIdEl) metaIdEl.textContent = idText;
   if (metaDateEl) metaDateEl.textContent = dateText;
 
