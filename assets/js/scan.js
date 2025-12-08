@@ -48,6 +48,7 @@ const scanSequenceProgressInnerEl = document.getElementById(
 // -----------------------------
 let currentPhase = "A0-1";
 let scanRunning = false;
+
 let pirOn = false;
 let pressureOn = false;
 
@@ -741,6 +742,9 @@ function updateProgress() {
 
     // 로딩바 폭
     progressBarInnerEl.style.width = `${ratio * 100}%`;
+    if (scanSequenceProgressInnerEl) {
+      scanSequenceProgressInnerEl.style.width = `${ratio * 100}%`;
+    }
 
     // 시간 텍스트
     const elapsed = scanOverallTimer; // 실제 흐른 초
@@ -1553,7 +1557,7 @@ if (debugStartBtn) {
     microProgress = 0;
     scanResultStarted = false;
     scanOverallTimer = 0;
-    scanrunning = false;
+    scanRunning = false;
 
     updateSensorStatus();
     setPhase("A0-1");
@@ -1580,6 +1584,7 @@ if (btnReset) {
     purity = 0;
     microProgress = 0;
     scanResultStarted = false;
+    scanRunning = false;
 
     updateSensorStatus();
     setPhase("A0-1");
@@ -1597,6 +1602,7 @@ if (btnYes) {
       purity = 0;
       microProgress = 0;
       scanResultStarted = false;
+      scanRunning = false;
 
       updateSensorStatus();
       setPhase("A0-1");
@@ -1614,6 +1620,8 @@ if (btnNo) {
       purity = 0;
       microProgress = 0;
       scanResultStarted = false;
+      scanRunning = false;
+
       updateSensorStatus();
       setPhase("A0-1");
     }, 4000);
@@ -1644,16 +1652,3 @@ standbyScreenEl.addEventListener("click", () => {
     updateProgress();
   }
 });
-
-// -----------------------------
-// POSTURE 화면 터치 → A1-2
-// -----------------------------
-if (postureEl) {
-  postureEl.addEventListener("click", () => {
-    if (currentPhase !== "POSTURE") return;
-    setPhase("A1-2");
-    scanTimer = 0;
-    purity = 0;
-    updateProgress();
-  });
-}

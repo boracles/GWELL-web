@@ -603,6 +603,91 @@ body {
   height: 100%;
 }
 
+/* ==========================
+   Scan sequence (하단 로딩바 단계 표시)
+========================== */
+
+.scan-sequence {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.scan-sequence-text {
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+
+/* 로딩바 + 점들을 하나의 stepper처럼 */
+.scan-sequence-stepper {
+  position: relative;
+  width: 100%;
+}
+
+/* 로딩바 (지금은 progressBarInnerEl를 메인으로 쓰지만,
+   시각적으로는 이 바 위에 점을 올려둘 수 있음) */
+.scan-sequence-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.85);
+  overflow: hidden;
+}
+
+.scan-sequence-progress-inner {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #22c55e, #a855f7, #38bdf8);
+  transition: width 0.3s ease;
+}
+
+/* 점/체크를 로딩바 위에 가로로 올리기 */
+.scan-sequence-dots {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none; /* 점 위에 버튼 없으니까 무시 */
+}
+
+.scan-step {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+/* 점 */
+.scan-step-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+/* 체크 */
+.scan-step-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* JS에서 .completed 붙어 있는 칸만 체크 보이게 */
+.scan-step.completed .scan-step-dot {
+  border-color: #22c55e;
+  background: #22c55e;
+}
+
+.scan-step.completed .scan-step-check {
+  opacity: 1;
+}
+
 /* 대기 중 호흡/살짝 흔들리는 느낌 */
 @keyframes postureIdle {
   0% {
