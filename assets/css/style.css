@@ -164,6 +164,15 @@ body {
    공통 app 레이아웃
 ========================== */
 
+/* 셰이더로 그릴 Standby 배경 캔버스 */
+#standbyShader {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .standby-screen,
 #scanRoot {
   box-sizing: border-box;
@@ -283,8 +292,8 @@ body {
 /* 힌트 문장: 페이드 인/아웃 애니메이션 */
 .standby-hint {
   margin-top: 18px;
-  font-size: 28px; /* 13px → 18px */
-  font-weight: 500;
+  font-size: 42px;
+  font-weight: 600;
   letter-spacing: 0.02em;
   opacity: 0;
   animation: hintFade 6s ease-in-out infinite;
@@ -660,31 +669,34 @@ body {
   transition: width 0.3s ease;
 }
 
-/* 점/체크를 로딩바 위에 가로로 올리기 */
+/* 점들을 로딩바 위에 올려놓기 (flex 지우기!) */
 .scan-sequence-dots {
   position: absolute;
   top: 50%;
   left: 0;
-  right: 0;
+  width: 100%;
+  height: 0;
   transform: translateY(-50%);
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none; /* 점 위에 버튼 없으니까 무시 */
+  pointer-events: none;
 }
 
+/* 각 점을 left: XX% 로 직접 위치시킬 거라 absolute */
 .scan-step {
-  position: relative;
-  width: 18px;
-  height: 18px;
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%); /* 점의 중심을 bar 위에 맞추기 */
+  top: 50%;
+  outline: 1px solid red !important; /*디버깅용*/
 }
 
-/* 점 */
 .scan-step-dot {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  border: 2px solid rgba(148, 163, 184, 0.7);
-  background: rgba(15, 23, 42, 0.9);
+  /* 🔴 기본 상태에서는 완전히 숨김 */
+  border: 2px solid transparent;
+  background: transparent;
 }
 
 /* 체크 */
@@ -877,6 +889,35 @@ body {
 
 .app--market .app-main {
   padding: 0 20px 20px;
+}
+
+/* ==========================
+   Scan 헤더 – 로고 중앙 정렬
+========================== */
+
+.app--scan .app-header {
+  display: flex; /* 숨기기 해제 */
+  justify-content: center; /* 가운데 정렬 */
+  align-items: center;
+  position: relative; /* 디버그 버튼 absolute 기준 */
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  background: #000000;
+}
+
+/* 로고 이미지 크기 */
+.scan-header-logo-img {
+  height: 56px; /* 필요하면 숫자만 조절 */
+  width: auto;
+  display: block;
+}
+
+/* 디버그 버튼은 오른쪽 상단으로 */
+.scan-header-debug {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .issue-bar {
@@ -1889,4 +1930,60 @@ section {
   .app-main-layout {
     flex-direction: column;
   }
+}
+
+/* ==========================
+   글로벌 상단 로고 레이어 (Standby & Scan 공통)
+========================== */
+.global-logo-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: auto;
+  padding: 16px 24px 0 24px;
+
+  display: block; /* flex 제거 */
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.global-logo-meta {
+  display: none;
+  flex-direction: row;
+  gap: 24px;
+  font-size: 12px;
+  color: #e5e7eb;
+  opacity: 0.9;
+}
+
+/* 각 컬럼은 세로 정렬 */
+.meta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.global-meta-line {
+  line-height: 1.4;
+}
+
+.global-meta-line span {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.global-logo-img {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  height: 56px;
+  width: auto;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.app-header--scan {
+  display: none !important;
 }

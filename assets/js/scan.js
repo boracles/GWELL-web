@@ -30,6 +30,8 @@ const scanSequenceEl = document.getElementById("scanSequence");
 const scanSequenceTextEl = document.getElementById("scanSequenceText");
 const scanStepEls = document.querySelectorAll(".scan-step[data-scan-step]");
 
+const standbyShaderCanvas = document.getElementById("standbyShader");
+
 const scanSequenceProgressInnerEl = document.getElementById(
   "scanSequenceProgressInner"
 );
@@ -58,6 +60,112 @@ let postureTimers = [];
 
 // 결과에 쓸 분석값
 let analysisResult = null;
+
+// -----------------------------
+// Standby 셰이더 배경 (flowmap 없이 꿀렁)
+// -----------------------------
+let standbyShaderRenderer = null;
+let standbyShaderScene = null;
+let standbyShaderCamera = null;
+let standbyShaderMesh = null;
+let standbyShaderClock = null;
+let standbyShaderAnimId = null;
+let standbyShaderReady = false;
+
+const standbyVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = vec4(position, 1.0);
+  }
+`;
+
+const standbyFragmentShader = `
+  uniform float u_time;
+  uniform sampler2D u_texture;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv;
+
+    // 세로/가로로 겹치는 파동
+    float wave1 = sin(uv.y * 5.0 + u_time * 1.2) * 0.015;
+    float wave2 = sin(uv.x * 7.0 - u_time * 1.0) * 0.01;
+
+    // 약간 더 유기적으로
+    float wave3 = sin((uv.x + uv.y) * 8.0 + u_time * 0.8) * 0.008;
+
+    uv.x += wave1 + wave2 + wave3;
+
+    vec4 color = texture2D(u_texture, uv);
+
+    // 살짝 어둡게/보라톤 살리기 (원하면 조절)
+    color.rgb *= 1.05;
+
+    gl_FragColor = color;
+  }
+`;
+
+function initStandbyShader() {
+  if (!standbyShaderCanvas || standbyShaderRenderer) return;
+  if (!window.THREE) return;
+
+  const THREE = window.THREE;
+
+  standbyShaderRenderer = new THREE.WebGLRenderer({
+    canvas: standbyShaderCanvas,
+    alpha: true,
+    antialias: true,
+  });
+  standbyShaderRenderer.setPixelRatio(window.devicePixelRatio || 1);
+  standbyShaderRenderer.setSize(window.innerWidth, window.innerHeight);
+
+  standbyShaderScene = new THREE.Scene();
+
+  // -1~+1 전체 화면을 덮는 정사각형
+  standbyShaderCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  standbyShaderScene.add(standbyShaderCamera);
+
+  const geometry = new THREE.PlaneGeometry(2, 2);
+
+  const textureLoader = new THREE.TextureLoader();
+  const texture = textureLoader.load("assets/img/Standby.jpg", () => {
+    standbyShaderReady = true;
+  });
+
+  texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping;
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      u_time: { value: 0 },
+      u_texture: { value: texture },
+    },
+    vertexShader: standbyVertexShader,
+    fragmentShader: standbyFragmentShader,
+  });
+
+  standbyShaderMesh = new THREE.Mesh(geometry, material);
+  standbyShaderScene.add(standbyShaderMesh);
+
+  standbyShaderClock = new THREE.Clock();
+}
+
+function animateStandbyShader() {
+  if (!standbyShaderRenderer || !standbyShaderScene || !standbyShaderCamera) {
+    return;
+  }
+
+  const dt = standbyShaderClock.getDelta();
+  const elapsed = standbyShaderClock.getElapsedTime();
+
+  if (standbyShaderMesh && standbyShaderMesh.material && standbyShaderReady) {
+    standbyShaderMesh.material.uniforms.u_time.value = elapsed;
+  }
+
+  standbyShaderRenderer.render(standbyShaderScene, standbyShaderCamera);
+
+  standbyShaderAnimId = requestAnimationFrame(animateStandbyShader);
+}
 
 // DOM 참조
 const statusPirEl = document.getElementById("statusPir");
@@ -100,9 +208,19 @@ const btnReset = document.getElementById("btnReset");
 const textCanvas = document.createElement("canvas");
 const textCtx = textCanvas.getContext("2d");
 
+const metaContainerEl = document.querySelector(".global-logo-meta");
+const metaStatusEl = document.getElementById("metaStatus");
+const metaLevelEl = document.getElementById("metaLevel");
+const metaIdEl = document.getElementById("metaId");
+const metaDateEl = document.getElementById("metaDate");
+
 // 윈도우 리사이즈 시 3D 씬 리사이즈
 window.addEventListener("resize", () => {
   resizeMicrobes();
+
+  if (standbyShaderRenderer) {
+    standbyShaderRenderer.setSize(window.innerWidth, window.innerHeight);
+  }
 });
 
 // -----------------------------
@@ -260,8 +378,13 @@ const scanStepTexts = [
 const SCAN_STEP_COUNT = scanStepTexts.length;
 let currentScanStep = -1;
 
-// stepIdx: 현재 진행 중인 단계(0~3)
-// completedCount: 완료된 칸 개수(0~4)
+function positionScanSteps() {
+  scanStepEls.forEach((el, i) => {
+    const ratio = (i + 1) / SCAN_STEP_COUNT; // 25%, 50%, 75%, 100%
+    el.style.left = `${ratio * 100}%`;
+  });
+}
+
 function updateScanStepUI(stepIdx, completedCount) {
   if (!scanSequenceEl) return;
 
@@ -298,12 +421,6 @@ function updateScanStepUI(stepIdx, completedCount) {
     Math.min(SCAN_STEP_COUNT, completedCount ?? 0)
   );
 
-  // ✅ 로딩바는 “완료된 칸” 기준으로만 딱딱 채우기 (0 / 25 / 50 / 75 / 100)
-  if (scanSequenceProgressInnerEl) {
-    const barRatio = maxCompleted / SCAN_STEP_COUNT;
-    scanSequenceProgressInnerEl.style.width = `${barRatio * 100}%`;
-  }
-
   // ✅ 체크: 완전히 끝난 칸까지만 체크
   //   - maxCompleted = 0 → 체크 0개 (시작)
   //   - maxCompleted = 1 → 첫 칸만 체크
@@ -324,6 +441,10 @@ function updateScanStepUI(stepIdx, completedCount) {
 function setPhase(phase) {
   if (currentPhase === phase) return;
   currentPhase = phase;
+
+  if (metaContainerEl) {
+    metaContainerEl.style.display = phase === "C2" ? "flex" : "none";
+  }
 
   if (statusPhaseEl) statusPhaseEl.textContent = phase;
   if (warningMessageEl) warningMessageEl.style.display = "none";
@@ -359,6 +480,12 @@ function setPhase(phase) {
       initStandbyParticles();
       standbyAnimReq = requestAnimationFrame(drawStandbyParticles);
     }
+
+    // 🔹 셰이더 배경 초기화 + 애니메이션 시작
+    initStandbyShader();
+    if (!standbyShaderAnimId) {
+      standbyShaderAnimId = requestAnimationFrame(animateStandbyShader);
+    }
   } else {
     if (standbyScreenEl) standbyScreenEl.style.display = "none";
     if (scanHeaderEl) scanHeaderEl.style.display = "flex";
@@ -368,6 +495,12 @@ function setPhase(phase) {
       cancelAnimationFrame(standbyAnimReq);
       standbyAnimReq = null;
     }
+
+    // 필요하면 스캔 중에는 셰이더 멈추고 싶을 때:
+    // if (standbyShaderAnimId) {
+    //   cancelAnimationFrame(standbyShaderAnimId);
+    //   standbyShaderAnimId = null;
+    // }
   }
 
   switch (phase) {
@@ -397,6 +530,8 @@ function setPhase(phase) {
         "장내자산관리공단입니다. 착석하시면 장내 데이터 스캔이 시작됩니다.";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.45;
+
+      positionScanSteps();
       showMicrobes(false);
       break;
 
@@ -753,16 +888,12 @@ function updateProgress() {
   }
 
   if (isScanPhase) {
-    // 🔹 전체 스캔 진행도 (0~1)
-    const ratio = Math.min(
-      1,
-      Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
-    );
+    // 🔹 0~1 구간: 정제율 기준
+    const ratio = Math.min(1, Math.max(0, purity / 100));
 
-    // 시간 텍스트
+    // ⏱ 시간 텍스트는 기존처럼 scanOverallTimer 기준
     const elapsed = scanOverallTimer;
     const total = SCAN_OVERALL_TOTAL;
-
     progressTimeEl.textContent = `${formatTime(elapsed)} / ${formatTime(
       total
     )}`;
@@ -770,25 +901,37 @@ function updateProgress() {
     remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
     statusTimerEl.textContent = formatTime(elapsed);
 
-    // 🔹 4등분 기준으로 "몇 구간까지 왔는지" 계산 (0~4)
-    const raw = ratio * SCAN_STEP_COUNT; // 0~4
-
-    // 현재 문장용 단계 index (0~3)
-    const stepIdx = Math.min(SCAN_STEP_COUNT - 1, Math.floor(raw));
-
-    // ✅ 완료된 칸 개수(0~4)
-    //  - 0.00 ~ 0.24 → 0칸 (체크 없음)
-    //  - 0.25 ~ 0.49 → 1칸
-    //  - 0.50 ~ 0.74 → 2칸 ...
-    let completedCount = Math.floor(raw);
-    if (ratio >= 1) {
-      completedCount = SCAN_STEP_COUNT; // 100%일 때 4칸 전부 체크
+    // ✅ 로딩바는 항상 부드럽게 채우기
+    if (scanSequenceProgressInnerEl) {
+      scanSequenceProgressInnerEl.style.width = `${ratio * 100}%`;
     }
 
-    // ✅ 문장 + 체크 + 작은 바를 같은 기준(raw)으로 갱신
+    // 🔹 0~1 구간: 전체 스캔 시간 비율
+    const timeRatio = Math.min(
+      1,
+      Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
+    );
+
+    // 🔹 문장(stepIdx) — 총 4문장 (0~3)
+    let stepIdx = 0;
+    if (timeRatio >= 0.25) stepIdx = 1;
+    if (timeRatio >= 0.5) stepIdx = 2;
+    if (timeRatio >= 0.75) stepIdx = 3;
+
+    // 🔹 체크(completedCount)
+    //   0~24% → 0개
+    //   25~49% → 1개
+    //   50~74% → 2개
+    //   75~99% → 3개
+    //   100% → 4개
+    let completedCount = 0;
+    if (timeRatio >= 0.25) completedCount = 1;
+    if (timeRatio >= 0.5) completedCount = 2;
+    if (timeRatio >= 0.75) completedCount = 3;
+    if (timeRatio >= 0.999) completedCount = 4;
+
     updateScanStepUI(stepIdx, completedCount);
   } else {
-    // 스캔 안 할 때: 단계 UI 숨김 + 초기화
     updateScanStepUI(-1, 0);
   }
 }
@@ -1223,6 +1366,27 @@ function renderAnalysisResult() {
       : productivityScore >= 0.4
       ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민에 가깝습니다."
       : "대사 효율이 낮아 에너지 확보가 버겁습니다. '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
+
+  // === 상단 로고 바 메타 정보 업데이트 ===
+  const statusText =
+    overallGrade === "A" ? "안정" : overallGrade === "B" ? "경계" : "주의";
+
+  const levelText = `LV-${overallGrade}`;
+
+  // 간단히 결과지용 ID 생성 (예: G-2345-A)
+  const idText =
+    "G-" + String(2000 + Math.floor(Math.random() * 9000)) + "-" + overallGrade;
+
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const dateText = `${yyyy}년 ${mm}월 ${dd}일`;
+
+  if (metaStatusEl) metaStatusEl.textContent = statusText;
+  if (metaLevelEl) metaLevelEl.textContent = levelText;
+  if (metaIdEl) metaIdEl.textContent = idText;
+  if (metaDateEl) metaDateEl.textContent = dateText;
 
   // === 헤더 텍스트(중앙 메인 문구도 여기서 맞춰줌) ===
   if (mainMessageEl) {

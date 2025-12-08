@@ -44,10 +44,47 @@
     <script src="assets/js/scan.js" defer></script>
   </head>
   <body>
+    <div class="global-logo-layer">
+      <!-- 🔹 결과지 메타 정보 (기본은 숨겨놓고 C2에서만 보이게 할 것) -->
+      <div class="global-logo-meta">
+        <!-- 왼쪽 세로 컬럼: 상태 / 등급 -->
+        <div class="meta-col meta-col--status">
+          <div class="global-meta-line">
+            장내 생태 상태 :
+            <span id="metaStatus">--</span>
+          </div>
+          <div class="global-meta-line">
+            데이터 처리 등급
+            <span id="metaLevel">LV-</span>
+          </div>
+        </div>
+
+        <!-- 오른쪽 세로 컬럼: ID / 스캔일 -->
+        <div class="meta-col meta-col--id">
+          <div class="global-meta-line">
+            ID
+            <span id="metaId">--</span>
+          </div>
+          <div class="global-meta-line">
+            스캔일
+            <span id="metaDate">----년 --월 --일</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🔹 우측 로고 -->
+      <img
+        src="assets/img/Logo.png"
+        class="global-logo-img"
+        alt="장내자산관리공단 로고"
+      />
+    </div>
+
     <div class="app app--scan">
       <!-- Standby 화면: 파티클 + 힌트 한 줄 -->
       <div id="standbyScreen" class="standby-screen">
         <div class="standby-bg"></div>
+        <canvas id="standbyShader"></canvas>
         <canvas id="standbyParticles"></canvas>
         <div class="standby-center">
           <div class="standby-hint" id="standbyHint">
@@ -56,13 +93,18 @@
         </div>
       </div>
 
-      <!-- 실제 스캔 UI 헤더 (이게 scanHeader) -->
-      <header class="app-header" id="scanHeader">
-        <div class="app-header__titles">
-          <h1 class="app-title">장내자산 스캔</h1>
+      <header class="app-header app-header--scan" id="scanHeader">
+        <div class="scan-header-logo">
+          <img
+            src="assets/img/Logo.png"
+            alt="장내자산관리공단 로고"
+            class="scan-header-logo-img"
+          />
         </div>
         <!-- 실제 설치에선 숨겨도 되는 디버그 버튼 -->
-        <button class="app-cta" id="debugStartBtn">디버그: 시퀀스 시작</button>
+        <button class="app-cta scan-header-debug" id="debugStartBtn">
+          디버그: 시퀀스 시작
+        </button>
       </header>
 
       <!-- 스캔 메인 영역 (이게 scanRoot) -->
