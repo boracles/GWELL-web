@@ -260,9 +260,8 @@ const scanStepTexts = [
 const SCAN_STEP_COUNT = scanStepTexts.length;
 let currentScanStep = -1;
 
-// 🔹 stepIdx: 0~3, -1이면 숨김
 // stepIdx: 현재 진행 중인 단계(0~3)
-// completedCount: "완료"로 볼 수 있는 칸 개수(0~4). 생략하면 stepIdx+1로 처리.
+// completedCount: 완료된 칸 개수(0~4)
 function updateScanStepUI(stepIdx, completedCount) {
   if (!scanSequenceEl) return;
 
@@ -270,11 +269,17 @@ function updateScanStepUI(stepIdx, completedCount) {
     // 스캔 안 할 때 → 숨기기 + 초기화
     scanSequenceEl.style.display = "none";
     if (scanSequenceTextEl) scanSequenceTextEl.textContent = "";
+
     scanStepEls.forEach((el) => {
       el.classList.remove("completed");
       const check = el.querySelector(".scan-step-check");
       if (check) check.style.opacity = "0";
     });
+
+    if (scanSequenceProgressInnerEl) {
+      scanSequenceProgressInnerEl.style.width = "0%";
+    }
+
     currentScanStep = -1;
     return;
   }
@@ -287,16 +292,25 @@ function updateScanStepUI(stepIdx, completedCount) {
     scanSequenceTextEl.textContent = scanStepTexts[idx];
   }
 
-  // 완료된 칸 개수 (0~4)
-  const maxCompleted =
-    completedCount !== undefined
-      ? Math.max(0, Math.min(SCAN_STEP_COUNT, completedCount))
-      : idx + 1;
+  // ✅ 완료된 칸 개수(0~4)로 클램프
+  const maxCompleted = Math.max(
+    0,
+    Math.min(SCAN_STEP_COUNT, completedCount ?? 0)
+  );
 
-  // 체크: "완료된 칸"까지만 ✔
+  // ✅ 로딩바는 “완료된 칸” 기준으로만 딱딱 채우기 (0 / 25 / 50 / 75 / 100)
+  if (scanSequenceProgressInnerEl) {
+    const barRatio = maxCompleted / SCAN_STEP_COUNT;
+    scanSequenceProgressInnerEl.style.width = `${barRatio * 100}%`;
+  }
+
+  // ✅ 체크: 완전히 끝난 칸까지만 체크
+  //   - maxCompleted = 0 → 체크 0개 (시작)
+  //   - maxCompleted = 1 → 첫 칸만 체크
+  //   - ...
   scanStepEls.forEach((el, i) => {
     const check = el.querySelector(".scan-step-check");
-    const completed = i < maxCompleted; // 🔹 '<' 로 바꿔서 마지막은 100% 때만
+    const completed = i < maxCompleted; // i < 1 → 첫 칸만, i < 2 → 첫/두 번째 ...
     el.classList.toggle("completed", completed);
     if (check) check.style.opacity = completed ? "1" : "0";
   });
@@ -734,24 +748,19 @@ function updateProgress() {
     currentPhase === "B3" ||
     currentPhase === "C1";
 
-  if (
-    !progressBarInnerEl ||
-    !progressTimeEl ||
-    !remainingTimeEl ||
-    !statusTimerEl
-  ) {
+  if (!progressTimeEl || !remainingTimeEl || !statusTimerEl) {
     return;
   }
 
   if (isScanPhase) {
-    // 🔹 전체 스캔 진행도 (0~1) → 시간/남은시간용
+    // 🔹 전체 스캔 진행도 (0~1)
     const ratio = Math.min(
       1,
       Math.max(0, scanOverallTimer / SCAN_OVERALL_TOTAL)
     );
 
     // 시간 텍스트
-    const elapsed = scanOverallTimer; // 실제 흐른 초
+    const elapsed = scanOverallTimer;
     const total = SCAN_OVERALL_TOTAL;
 
     progressTimeEl.textContent = `${formatTime(elapsed)} / ${formatTime(
@@ -761,28 +770,26 @@ function updateProgress() {
     remainingTimeEl.textContent = `남은 시간: ${formatTime(remaining)}`;
     statusTimerEl.textContent = formatTime(elapsed);
 
-    // 🔹 ratio(0~1)를 4구간(0~4)로 변환
+    // 🔹 4등분 기준으로 "몇 구간까지 왔는지" 계산 (0~4)
     const raw = ratio * SCAN_STEP_COUNT; // 0~4
 
-    // 현재 "문장 단계" index (0~3)
+    // 현재 문장용 단계 index (0~3)
     const stepIdx = Math.min(SCAN_STEP_COUNT - 1, Math.floor(raw));
 
-    // ✅ 완료된 구간 개수(0~4): 체크 + 로딩바 둘 다 이걸 기준으로
-    const completedCount = Math.min(SCAN_STEP_COUNT, Math.floor(raw));
-
-    // ✅ 로딩바는 "완료된 구간" 기준으로만 채움 (0%,25%,50%,75%,100%)
-    if (scanSequenceProgressInnerEl) {
-      const barRatio = completedCount / SCAN_STEP_COUNT;
-      scanSequenceProgressInnerEl.style.width = `${barRatio * 100}%`;
+    // ✅ 완료된 칸 개수(0~4)
+    //  - 0.00 ~ 0.24 → 0칸 (체크 없음)
+    //  - 0.25 ~ 0.49 → 1칸
+    //  - 0.50 ~ 0.74 → 2칸 ...
+    let completedCount = Math.floor(raw);
+    if (ratio >= 1) {
+      completedCount = SCAN_STEP_COUNT; // 100%일 때 4칸 전부 체크
     }
 
-    // ✅ 단계가 바뀌는 순간에만 문장/체크 갱신
-    if (stepIdx !== currentScanStep) {
-      updateScanStepUI(stepIdx, completedCount);
-    }
+    // ✅ 문장 + 체크 + 작은 바를 같은 기준(raw)으로 갱신
+    updateScanStepUI(stepIdx, completedCount);
   } else {
-    // 스캔 안 할 때: 단계 UI 숨김
-    updateScanStepUI(-1);
+    // 스캔 안 할 때: 단계 UI 숨김 + 초기화
+    updateScanStepUI(-1, 0);
   }
 }
 
