@@ -30,6 +30,10 @@ const scanSequenceEl = document.getElementById("scanSequence");
 const scanSequenceTextEl = document.getElementById("scanSequenceText");
 const scanStepEls = document.querySelectorAll(".scan-step[data-scan-step]");
 
+// 상단 큰 문구 엘리먼트
+const scanPhaseTextEl = document.getElementById("scanPhaseText");
+// 상단 정제율 값
+const phasePurityValueEl = document.getElementById("phasePurityValue");
 const standbyShaderCanvas = document.getElementById("standbyShader");
 
 const progressRowEl = document.getElementById("progressRow");
@@ -63,6 +67,8 @@ let postureTimers = [];
 
 // 결과에 쓸 분석값
 let analysisResult = null;
+
+let testTriggered = false;
 
 // -----------------------------
 // Standby 셰이더 배경 (flowmap 없이 꿀렁)
@@ -376,9 +382,12 @@ const scanStepTexts = [
 const SCAN_STEP_COUNT = scanStepTexts.length;
 let currentScanStep = -1;
 
+// 단계 점(1~4)을 로딩바 위에 위치만 잡아주는 함수
 function positionScanSteps() {
+  if (!scanStepEls || !scanStepEls.length) return;
+
   scanStepEls.forEach((el, i) => {
-    const ratio = (i + 1) / SCAN_STEP_COUNT; // 25%, 50%, 75%, 100%
+    const ratio = i / (SCAN_STEP_COUNT - 1);
     el.style.left = `${ratio * 100}%`;
   });
 }
@@ -390,6 +399,12 @@ function updateScanStepUI(stepIdx, completedCount) {
     // 스캔 안 할 때 → 숨기기 + 초기화
     scanSequenceEl.style.display = "none";
     if (scanSequenceTextEl) scanSequenceTextEl.textContent = "";
+
+    // 🔹 상단 문구도 초기화
+    if (scanPhaseTextEl) {
+      scanPhaseTextEl.textContent = "";
+      scanPhaseTextEl.style.opacity = 0;
+    }
 
     scanStepEls.forEach((el) => {
       el.classList.remove("completed");
@@ -408,9 +423,15 @@ function updateScanStepUI(stepIdx, completedCount) {
   const idx = Math.max(0, Math.min(SCAN_STEP_COUNT - 1, stepIdx));
   scanSequenceEl.style.display = "block";
 
-  // 현재 단계 문장
+  // 현재 단계 문장 (하단 작은 텍스트)
   if (scanSequenceTextEl) {
     scanSequenceTextEl.textContent = scanStepTexts[idx];
+  }
+
+  // 🔹 상단 큰 텍스트도 동일하게 표시
+  if (scanPhaseTextEl) {
+    scanPhaseTextEl.textContent = scanStepTexts[idx];
+    scanPhaseTextEl.style.opacity = 1;
   }
 
   // ✅ 완료된 칸 개수(0~4)로 클램프
@@ -520,7 +541,11 @@ function setPhase(phase) {
       if (standbyHintEl) standbyHintEl.style.display = "block";
       if (statusSystemEl) statusSystemEl.textContent = "IDLE";
 
-      // 🔹 중앙 문구는 완전히 숨김
+      if (phasePurityValueEl) {
+        phasePurityValueEl.style.display = "none";
+        phasePurityValueEl.textContent = "";
+      }
+      // 중앙 문구는 완전히 숨김
       if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
       mainMessageEl.textContent = "";
       subMessageEl.textContent = "";
@@ -539,7 +564,10 @@ function setPhase(phase) {
     case "A0-2":
       if (statusSystemEl) statusSystemEl.textContent = "READY";
 
-      // 🔹 여기서도 중앙 문구 숨김
+      if (phasePurityValueEl) {
+        phasePurityValueEl.style.display = "none";
+        phasePurityValueEl.textContent = "";
+      } // 여기서도 중앙 문구 숨김
       if (scanMainMessageEl) scanMainMessageEl.style.display = "none";
       mainMessageEl.textContent = "";
       subMessageEl.textContent = "";
@@ -862,6 +890,12 @@ function setPhase(phase) {
       secondaryMessageEl.textContent =
         "이 장내 데이터를 사회 자산으로 상장하시겠습니까?";
 
+      // 🔥 결과 화면에서는 상단 스캔 안내 문구 완전 제거
+      if (scanPhaseTextEl) {
+        scanPhaseTextEl.textContent = "";
+        scanPhaseTextEl.style.opacity = 0;
+      }
+
       if (scanResultLayoutEl) scanResultLayoutEl.style.display = "grid";
       if (gutVisualEl) gutVisualEl.style.display = "flex";
 
@@ -875,6 +909,7 @@ function setPhase(phase) {
       mainMessageEl.textContent = "상장 절차를 진행합니다.";
       subMessageEl.textContent =
         "정제된 장내 데이터가 공단 시스템으로 전송되고 있습니다. 뒤쪽 화면에서 상장 결과를 확인해 주세요.";
+
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg spiral";
       scanBgEl.style.opacity = 0.9;
@@ -931,6 +966,7 @@ function updateSensorStatus() {
 // 진행바 업데이트 + 스캔 단계 연동
 // -----------------------------
 function updateProgress() {
+  // 하단 정제율 숫자
   if (purityValueEl) {
     purityValueEl.textContent = `${Math.round(purity)}%`;
   }
@@ -942,14 +978,22 @@ function updateProgress() {
     currentPhase === "B3" ||
     currentPhase === "C1";
 
+  // 상단 정제율 표시 제어
+  if (phasePurityValueEl) {
+    if (isScanPhase) {
+      phasePurityValueEl.style.display = "inline";
+      phasePurityValueEl.textContent = `${Math.round(purity)}%`;
+    } else {
+      phasePurityValueEl.style.display = "none";
+      phasePurityValueEl.textContent = "";
+    }
+  }
+
   if (!progressTimeEl || !remainingTimeEl || !statusTimerEl) {
     return;
   }
 
   if (isScanPhase) {
-    // 🔹 정제율(0~1) – 텍스트용
-    const purityRatio = Math.min(1, Math.max(0, purity / 100));
-
     // 🔹 전체 스캔 시간 비율(0~1) – 로딩바/단계용 (절대 후퇴 안 함)
     const timeRatio = Math.min(
       1,
@@ -971,30 +1015,27 @@ function updateProgress() {
       scanSequenceProgressInnerEl.style.width = `${timeRatio * 100}%`;
     }
 
-    // ✅ "문장" 단계: 현재 구간
-    //   0~24%   → 0번 문장
-    //   25~49%  → 1번 문장
-    //   50~74%  → 2번 문장
-    //   75~100% → 3번 문장
+    // ✅ "문장" 단계 / 완료 개수 계산
     let stepIdx = 0;
-    if (timeRatio >= 0.25) stepIdx = 1;
-    if (timeRatio >= 0.5) stepIdx = 2;
-    if (timeRatio >= 0.75) stepIdx = 3;
-
-    // ✅ "완료된 체크" 개수
-    //   0~24%   → 0개
-    //   25~49%  → 1개
-    //   50~74%  → 2개
-    //   75~99%  → 3개
-    //   100%    → 4개
     let completedCount = 0;
-    if (timeRatio >= 0.25) completedCount = 1;
-    if (timeRatio >= 0.5) completedCount = 2;
-    if (timeRatio >= 0.75) completedCount = 3;
-    if (timeRatio >= 0.999) completedCount = 4;
+
+    if (scanOverallTimer === 0) {
+      stepIdx = 0;
+      completedCount = 1;
+    } else {
+      if (timeRatio >= 0.25) stepIdx = 1;
+      if (timeRatio >= 0.5) stepIdx = 2;
+      if (timeRatio >= 0.75) stepIdx = 3;
+
+      if (timeRatio >= 0.25) completedCount = 1;
+      if (timeRatio >= 0.5) completedCount = 2;
+      if (timeRatio >= 0.75) completedCount = 3;
+      if (timeRatio >= 0.999) completedCount = 4;
+    }
 
     updateScanStepUI(stepIdx, completedCount);
   } else {
+    // 스캔 단계 아닐 때는 로딩바/단계 표시 리셋
     updateScanStepUI(-1, 0);
   }
 }
@@ -1028,6 +1069,8 @@ function initMicrobeScene() {
   const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
   const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
 
+  const THREE = window.THREE;
+
   microRenderer = new THREE.WebGLRenderer({
     canvas: scanMicrobesCanvas,
     alpha: true,
@@ -1042,8 +1085,9 @@ function initMicrobeScene() {
   microCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 200);
   microCamera.position.set(0, 0, 55);
 
-  const amb = new THREE.AmbientLight(0xffffff, 0.6);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+  // 조명
+  const amb = new THREE.AmbientLight(0xffffff, 0.35);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
   dir.position.set(5, 10, 7);
   microScene.add(amb, dir);
 
@@ -1052,10 +1096,9 @@ function initMicrobeScene() {
   microScene.add(microGroup);
 
   const loader = new window.GLTFLoader();
-
   const texLoader = new THREE.TextureLoader();
 
-  // 🎨 알베도(A)
+  // 기본 색 텍스처만 사용 (에미시브/노멀 일단 제거)
   const colorMaps = [
     texLoader.load("assets/img/1_A.png"),
     texLoader.load("assets/img/2_A.png"),
@@ -1063,27 +1106,13 @@ function initMicrobeScene() {
     texLoader.load("assets/img/4_A.png"),
   ];
 
-  // ✨ Emission(E)
-  const emissiveMaps = [
-    texLoader.load("assets/img/1_E.png"),
-    texLoader.load("assets/img/2_E.png"),
-    texLoader.load("assets/img/3_E.png"),
-    texLoader.load("assets/img/4_E.png"),
-  ];
-
-  // 🔹 Normal(N) (없으면 알아서 null)
-  const normalMaps = [
-    texLoader.load("assets/img/1_N.png"),
-    texLoader.load("assets/img/2_N.png"),
-    texLoader.load("assets/img/3_N.png"),
-    texLoader.load("assets/img/4_N.png"),
-  ];
-
-  // 텍스처 색공간을 sRGB로 (채도/명도 살리기)
-  [...colorMaps, ...emissiveMaps].forEach((tex) => {
+  // 색공간 / flipY 통일
+  colorMaps.forEach((tex) => {
     if (!tex) return;
-    if (tex.encoding !== undefined) tex.encoding = THREE.sRGBEncoding; // old
-    if (tex.colorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace; // new
+    if ("colorSpace" in tex) {
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
+    tex.flipY = false;
   });
 
   const loadPromises = MICRO_MODEL_PATHS.map(
@@ -1100,50 +1129,15 @@ function initMicrobeScene() {
 
   Promise.all(loadPromises)
     .then((scenes) => {
-      // 🔥 각 Microbiome_n.glb 에 대응하는 채도 높은 머티리얼 입히기
-      scenes.forEach((scene, index) => {
-        const colorMap = colorMaps[index] || null;
-        const emissiveMap = emissiveMaps[index] || null;
-        const normalMap = normalMaps[index] || null;
-
-        scene.traverse((obj) => {
-          if (!obj.isMesh) return;
-
-          const matParams = {
-            map: colorMap || null,
-            metalness: 0.0,
-            roughness: 0.35, // 조금 더 반짝이게
-            transparent: true,
-            side: THREE.DoubleSide,
-          };
-
-          // Emission 텍스처 + 발광 색
-          if (emissiveMap) {
-            matParams.emissiveMap = emissiveMap;
-            matParams.emissive = new THREE.Color(0x9c5cff); // 보라빛 발광
-            matParams.emissiveIntensity = 4.8; // 🔼 채도/밝기 느낌
-          }
-
-          if (normalMap) {
-            matParams.normalMap = normalMap;
-          }
-
-          // 맵 전체에 약간 컬러 틴트 (채도 강화 느낌)
-          matParams.color = new THREE.Color(1.15, 1.1, 1.25); // RGB >1 가능
-
-          obj.material = new THREE.MeshStandardMaterial(matParams);
-        });
-      });
-
       const COUNT = 70;
 
       for (let i = 0; i < COUNT; i++) {
-        const modelIndex = i % scenes.length;
-        const baseScene = scenes[modelIndex].clone(true);
-
+        const sceneIndex = i % scenes.length;
+        const baseScene = scenes[sceneIndex].clone(true);
         const wrapper = new THREE.Group();
         wrapper.add(baseScene);
 
+        // 각 개체의 배치/스케일
         const baseRadius = 2 + Math.random() * 10;
         const baseAngle = Math.random() * Math.PI * 2;
         const baseHeight = (Math.random() - 0.5) * 4;
@@ -1156,7 +1150,6 @@ function initMicrobeScene() {
 
         const baseScale = 0.16 + Math.random() * 0.12;
         wrapper.scale.set(baseScale, baseScale, baseScale);
-
         wrapper.userData = {
           baseRadius,
           baseAngle,
@@ -1165,7 +1158,43 @@ function initMicrobeScene() {
           offset: Math.random() * 1000,
           swirlDir: Math.random() > 0.5 ? 1 : -1,
           spawnOffset: Math.random(),
+          // 🔹 이 개체가 어떤 모델 타입인지 기록 (0~3)
+          typeIndex: sceneIndex,
         };
+
+        // 🔹 여기서 머티리얼 “단순하게” 적용
+        wrapper.traverse((obj) => {
+          if (!obj.isMesh) return;
+
+          const colorMap = colorMaps[sceneIndex] || null;
+
+          // -----------------------------------
+          // ✨ Microbiome_3.glb (index === 2)
+          //     → 내부 메쉬 2개 중
+          //         meshIndex === 1 에만 3Ext_A 텍스처 적용
+          // -----------------------------------
+          if (sceneIndex === 2) {
+            if (!obj.userData._meshIndexAssigned)
+              obj.userData._meshIndexAssigned = 0;
+            const meshIdx = obj.userData._meshIndexAssigned++;
+
+            if (meshIdx === 1) {
+              // 두 번째 메쉬
+              colorMap = texLoader.load("assets/img/3Ext_A.png");
+              colorMap.flipY = false;
+              if ("colorSpace" in colorMap)
+                colorMap.colorSpace = THREE.SRGBColorSpace;
+            }
+          }
+
+          obj.material = new THREE.MeshStandardMaterial({
+            map: colorMap,
+            metalness: 0.0,
+            roughness: 0.4,
+            transparent: true,
+            side: THREE.DoubleSide,
+          });
+        });
 
         microGroup.add(wrapper);
       }
@@ -1202,6 +1231,39 @@ function animateMicrobes() {
   let targetProgress = 0;
 
   if (currentPhase === "POSTURE") {
+    targetProgress = 0.2;
+  } else if (currentPhase === "A1-2") {
+    targetProgress = 0.25;
+  } else if (currentPhase === "B1") {
+    targetProgress = 0.45;
+  } else if (currentPhase === "B2") {
+    targetProgress = 0.75;
+  } else if (currentPhase === "B3" || currentPhase === "C1") {
+    targetProgress = 1.0;
+  } else {
+    targetProgress = 0;
+  }
+
+  // 🔹 현재 Phase에 따라 “사용할 미생물 종류 개수”
+  // 0: 안 보임 / 1종류 / 2종류 / 3종류 / 4종류
+  let activeTypeCount = 0;
+  if (currentPhase === "POSTURE" || currentPhase === "A1-2") {
+    activeTypeCount = 1; // 한 종류만
+  } else if (currentPhase === "B1") {
+    activeTypeCount = 2;
+  } else if (currentPhase === "B2") {
+    activeTypeCount = 3;
+  } else if (
+    currentPhase === "B3" ||
+    currentPhase === "C1" ||
+    currentPhase === "C2" ||
+    currentPhase === "C3" ||
+    currentPhase === "C4"
+  ) {
+    activeTypeCount = 4; // 모든 종류
+  }
+
+  if (currentPhase === "POSTURE") {
     // 🔥 감지 문장 타이밍에 미생물이 보이게 하기 위한 값
     targetProgress = 0.2; // 0.15~0.3 아무 값 OK (카메라 z도 살짝 전진)
   } else if (currentPhase === "A1-2") {
@@ -1230,6 +1292,13 @@ function animateMicrobes() {
 
   microGroup.children.forEach((wrapper) => {
     const d = wrapper.userData;
+
+    // 아직 허용되지 않은 타입이면 아예 숨김
+    //   typeIndex: 0,1,2,3  / activeTypeCount: 1이면 0만 보이게
+    if (typeof d.typeIndex === "number" && d.typeIndex >= activeTypeCount) {
+      wrapper.visible = false;
+      return;
+    }
 
     let appear = (microProgress * 1.2 - d.spawnOffset) / 0.5;
     if (appear < 0) appear = 0;
@@ -1398,7 +1467,7 @@ function generateAnalysisFromGutProfile(profile) {
   };
 }
 
-// 🔹 이 함수만 교체
+// 🔹 결과 패널 + 레이더 카드 1 + 지표 카드 5
 function renderAnalysisResult() {
   if (!analysisResult || !resultListEl) return;
 
@@ -1416,14 +1485,13 @@ function renderAnalysisResult() {
   else if (overallScore >= 0.4) overallGrade = "B";
   else overallGrade = "C";
 
-  // 등급별 색상 (주식창처럼)
   const gradeColorMap = {
-    A: "#22c55e", // 초록
-    B: "#eab308", // 노랑
-    C: "#ef4444", // 빨강
+    A: "#22c55e",
+    B: "#eab308",
+    C: "#ef4444",
   };
 
-  // 등급별 장 이미지 선택
+  // 장 이미지
   if (gutImageEl) {
     let imgPath = "assets/img/gut-neutral.png";
     if (overallGrade === "A") imgPath = "assets/img/gut-good.png";
@@ -1432,26 +1500,28 @@ function renderAnalysisResult() {
   }
 
   const gradeColor = gradeColorMap[overallGrade];
+  document.documentElement.style.setProperty("--gut-score-color", gradeColor);
 
-  // 등급별 한줄 상태 문장
+  // 등급별 문장
   let actionLine;
   if (overallGrade === "A") {
     actionLine =
-      "공단은 현재 장내 생태를 사회 순환 구조 유지에 적극 활용할 것을 권고합니다.";
+      "귀하는 공단이 장기간 확보하기를 희망하는 생태 조건을 보유하고 있습니다. 본 자산을 사회 순환망에 상장하고, 지속 기여 프로그램에 참여해 주시기 바랍니다.";
   } else if (overallGrade === "B") {
     actionLine =
-      "공단은 추가 개입 없이 경과 관찰을 권고합니다. 필요 시 부분적인 조정이 요구될 수 있습니다.";
+      "귀하는 공단의 기준에 근접한 생태 조건을 보유하고 있습니다. 본 자산의 사회 순환 기여도를 증폭하기 위해 공단이 제공하는 정밀 장내 보정 프로그램을 단계적으로 이용하시기 바랍니다.";
   } else {
-    actionLine = "공단은 사회 순환 효율 복원을 위한 조치 이행을 권고합니다.";
+    actionLine =
+      "귀하는 현재 공단의 사회 순환망 편입 기준에 미달하는 생태 조건을 보유하고 있습니다. 자산 손실을 최소화하기 위해 공단의 전면 장내 재구성 및 집중 관리 프로그램을 우선적으로 이용하시기 바랍니다.";
   }
 
-  // === 5개 범주 점수 ===
+  // === 5개 지표 (0~1) ===
   const pct = (x) => `${Math.round(x * 100)}%`;
 
-  const diversityScore = 1 - (sm.NRS ?? 0.5); // 정상성 폭 (넓을수록 좋음)
+  const diversityScore = 1 - (sm.NRS ?? 0.5);
   const conformityScore = sm.CS ?? 0.5;
   const cohesionScore = sm.CI ?? 0.5;
-  const conflictScore = sm.CFI ?? 0.5; // 높을수록 갈등↑
+  const conflictScore = sm.CFI ?? 0.5;
   const productivityScore = sm.PS ?? 0.5;
 
   const gradeFromScore = (score, invert = false) => {
@@ -1468,7 +1538,6 @@ function renderAnalysisResult() {
   const conflictGrade = gradeFromScore(conflictScore, true);
   const productivityGrade = gradeFromScore(productivityScore);
 
-  // 간단 설명들
   const diversityText =
     diversityScore >= 0.7
       ? "다양한 미생물이 공존하고 있습니다. 여러 정체성이 공존하는 포용적 사회에 가깝습니다."
@@ -1504,13 +1573,10 @@ function renderAnalysisResult() {
       ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민에 가깝습니다."
       : "대사 효율이 낮아 에너지 확보가 버겁습니다. '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
 
-  // === 상단 로고 바 메타 정보 업데이트 ===
+  // === 상단 메타 ===
   const statusText =
     overallGrade === "A" ? "안정" : overallGrade === "B" ? "경계" : "주의";
 
-  const levelText = `LV-${overallGrade}`;
-
-  // 간단히 결과지용 ID 생성 (예: G-2345-A)
   const idText =
     "G-" + String(2000 + Math.floor(Math.random() * 9000)) + "-" + overallGrade;
 
@@ -1521,9 +1587,10 @@ function renderAnalysisResult() {
   const dateText = `${yyyy}년 ${mm}월 ${dd}일`;
 
   if (metaStatusEl) metaStatusEl.textContent = statusText;
-  if (metaLevelEl) metaLevelEl.textContent = levelText;
+  if (metaLevelEl) metaLevelEl.textContent = overallGrade;
+  if (metaIdEl) metaIdEl.textContent = idText;
+  if (metaDateEl) metaDateEl.textContent = dateText;
 
-  // 👉 색상용 클래스 리셋
   if (metaStatusEl) {
     metaStatusEl.classList.remove("status-good", "status-warn", "status-bad");
   }
@@ -1531,23 +1598,13 @@ function renderAnalysisResult() {
     metaLevelEl.classList.remove("status-good", "status-warn", "status-bad");
   }
 
-  // 👉 전체 등급(overallGrade)에 따라 색상 결정
-  let statusClass = "status-warn"; // 기본: B = 경계
+  let statusClass = "status-warn";
+  if (overallGrade === "A") statusClass = "status-good";
+  else if (overallGrade === "C") statusClass = "status-bad";
 
-  if (overallGrade === "A") {
-    statusClass = "status-good";
-  } else if (overallGrade === "C") {
-    statusClass = "status-bad";
-  }
-
-  // 👉 장내 생태 상태 / 데이터 처리 등급에 색 적용
   if (metaStatusEl) metaStatusEl.classList.add(statusClass);
   if (metaLevelEl) metaLevelEl.classList.add(statusClass);
 
-  if (metaIdEl) metaIdEl.textContent = idText;
-  if (metaDateEl) metaDateEl.textContent = dateText;
-
-  // === 헤더 텍스트(중앙 메인 문구도 여기서 맞춰줌) ===
   if (mainMessageEl) {
     mainMessageEl.textContent = `귀하의 장내 생태는 사회 적응도 ${overallScoreText}로 판정되었습니다.`;
   }
@@ -1555,212 +1612,397 @@ function renderAnalysisResult() {
     subMessageEl.textContent = actionLine;
   }
 
+  const gutSummaryEl = document.getElementById("gutSummaryText");
+  if (gutSummaryEl) {
+    gutSummaryEl.innerHTML = `
+      <div class="gut-summary-main">
+        귀하의 장내 생태는 사회 적응도
+        <span class="gut-summary-score">${overallScoreText}</span>
+        로 판정되었습니다.
+      </div>
+      <div class="gut-summary-sub">
+        ${actionLine}
+      </div>
+    `;
+  }
+
+  // === 오른쪽: 6개 박스 (레이더 1 + 카드 5) ===
   resultListEl.style.display = "block";
   resultListEl.innerHTML = `
-  <div class="gut-layout-right-inner"
-       style="display:flex; flex-direction:column; gap:16px; padding-top:24px;">
-    
-    <!-- 🔹 상단 종합 리포트 제목 -->
-    <div style="
-      align-self:flex-end;
-      font-size:13px;
-      letter-spacing:0.18em;
-      text-transform:uppercase;
-      color:#6b7280;
-    ">
-      장내 생태 사회 적응도 종합 리포트
-    </div>
-
-    <!-- 한눈에 보는 결과 헤더 -->
-    <div style="
-      border-radius:16px;
-      padding:16px 18px;
-      background:rgba(248,250,252,0.95);
-      box-shadow:0 8px 20px rgba(15,23,42,0.06);
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-    ">
-      <div>
-        <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">
-          귀하의 장내 생태는
-        </div>
-        <div style="font-size:16px; font-weight:600; color:#111827; line-height:1.4;">
-          사회 적응도 <span style="color:${gradeColor};">${overallScoreText}</span>로 판정되었습니다.<br/>
-          <span style="font-size:13px; color:#4b5563;">${actionLine}</span>
-        </div>
-      </div>
+    <div class="gut-layout-right-inner"
+         style="display:flex; flex-direction:column; gap:16px; padding-top:24px; height:100%;">
+      
       <div style="
-        min-width:72px;
-        text-align:center;
-        padding:8px 10px;
-        border-radius:14px;
-        background:${gradeColor}1A;
-        border:1px solid ${gradeColor};
+        align-self:flex-start;
+        font-size:16px;
+        letter-spacing:0.18em;
+        text-transform:uppercase;
+        color:#FAF2E5;
+        font-weight:700;
+        display:flex;
+        align-items:center;
+        gap:6px;
       ">
-        <div style="font-size:11px; color:#4b5563; margin-bottom:2px;">등급</div>
-        <div style="font-size:22px; font-weight:700; color:${gradeColor};">
-          ${overallGrade}
-        </div>
+        <span style="color:${gradeColor};">●</span>
+        <span>장내 생태 기반 사회 적응도 분석 보고서</span>
       </div>
-    </div>
 
-    <!-- 세부 범주 5개 -->
-    <div style="
+<div style="
+      flex:1;
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:14px;
+      grid-auto-rows:minmax(0, 1fr); /* 각 줄 높이를 자동으로 꽉 채우기 */
+      gap:10px;
+      min-height:0;
     ">
-      <div style="
-        background:#ffffff;
-        border-radius:14px;
-        padding:12px 14px;
-        box-shadow:0 6px 16px rgba(15,23,42,0.05);
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-size:12px; font-weight:600; color:#111827;">
-            장내 다양성 & 정상성의 폭
-          </span>
-          <span style="
-            font-size:11px;
-            font-weight:700;
-            padding:2px 8px;
-            border-radius:999px;
-            background:#eef2ff;
-            color:#4f46e5;
-          ">${diversityGrade}</span>
-        </div>
-        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-          D = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
-        </div>
-        <p style="font-size:11px; color:#4b5563; margin:0;">
-          ${diversityText}
-        </p>
-      </div>
 
-      <div style="
-        background:#ffffff;
-        border-radius:14px;
-        padding:12px 14px;
-        box-shadow:0 6px 16px rgba(15,23,42,0.05);
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-size:12px; font-weight:600; color:#111827;">
-            규범 적합도 (순응 점수)
-          </span>
-          <span style="
-            font-size:11px;
-            font-weight:700;
-            padding:2px 8px;
-            border-radius:999px;
-            background:#eef2ff;
-            color:#4f46e5;
-          ">${conformityGrade}</span>
+<!-- 0. 레이더 카드 (한 칸짜리, 더 낮게) -->
+<div style="
+  background:#ffffff;
+  border-radius:12px;
+  padding:8px 10px 10px 10px;
+  box-shadow:0 4px 10px rgba(15,23,42,0.06);
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+">
+
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:12px; font-weight:600; color:#111827;">
+              장내 사회 지표 레이더
+            </div>
+            <div style="display:flex; gap:8px; font-size:10px; color:#6b7280;">
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="width:10px;height:10px;border-radius:999px;background:#38bdf8;display:inline-block;"></span>
+                <span>현재 프로파일</span>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:11px; color:#6b7280;">
+            장내 다양성, 규범 적합도, 결속 에너지, 갈등·혐오 지수, 사회적 생산성을 한눈에 요약한 그래프입니다.
+          </div>
+          <div style="position:relative; flex:1; min-height:180px;">
+            <canvas id="gutRadar"
+              style="width:100%;height:100%;display:block;"></canvas>
+          </div>
         </div>
-        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-          B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
+
+        <!-- 1. 다양성 -->
+        <div style="
+          background:#FAF2E5;
+          opacity: 0.5;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+          display:flex;
+          flex-direction:column;
+          gap:4px;
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img src="assets/img/Gut_1.svg" alt="장내 다양성 아이콘"
+                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
+              <span style="font-size:12px; font-weight:600; color:#111827;">
+                장내 다양성 & 정상성의 폭
+              </span>
+            </div>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${diversityGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280;">
+            D = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
+            ${diversityText}
+          </p>
+        </div>
+
+        <!-- 2. 규범 적합도 -->
+        <div style="
+          background:#FAF2E5;
+          opacity: 0.5;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+          display:flex;
+          flex-direction:column;
+          gap:4px;
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img src="assets/img/Gut_2.svg" alt="규범 적합도 아이콘"
+                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
+              <span style="font-size:12px; font-weight:600; color:#111827;">
+                규범 적합도 (순응 점수)
+              </span>
+            </div>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${conformityGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280;">
+            B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
     conformityScore
   )}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
+            ${conformityText}
+          </p>
         </div>
-        <p style="font-size:11px; color:#4b5563; margin:0;">
-          ${conformityText}
-        </p>
-      </div>
 
-      <div style="
-        background:#ffffff;
-        border-radius:14px;
-        padding:12px 14px;
-        box-shadow:0 6px 16px rgba(15,23,42,0.05);
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-size:12px; font-weight:600; color:#111827;">
-            공동체 결속 에너지 (SCFA)
-          </span>
-          <span style="
-            font-size:11px;
-            font-weight:700;
-            padding:2px 8px;
-            border-radius:999px;
-            background:#eef2ff;
-            color:#4f46e5;
-          ">${cohesionGrade}</span>
+        <!-- 3. 결속 에너지 -->
+        <div style="
+      background:#FAF2E5;
+          opacity: 0.5;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+          display:flex;
+          flex-direction:column;
+          gap:4px;
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img src="assets/img/Gut_3.svg" alt="결속 에너지 아이콘"
+                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
+              <span style="font-size:12px; font-weight:600; color:#111827;">
+                공동체 결속 에너지 (SCFA)
+              </span>
+            </div>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${cohesionGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280;">
+            Bt = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
+            ${cohesionText}
+          </p>
         </div>
-        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-          Bt = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
-        </div>
-        <p style="font-size:11px; color:#4b5563; margin:0;">
-          ${cohesionText}
-        </p>
-      </div>
 
-      <div style="
-        background:#ffffff;
-        border-radius:14px;
-        padding:12px 14px;
-        box-shadow:0 6px 16px rgba(15,23,42,0.05);
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-size:12px; font-weight:600; color:#111827;">
-            갈등·혐오 지수 (염증 로드)
-          </span>
-          <span style="
-            font-size:11px;
-            font-weight:700;
-            padding:2px 8px;
-            border-radius:999px;
-            background:#eef2ff;
-            color:#4f46e5;
-          ">${conflictGrade}</span>
-        </div>
-        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-          L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
+        <!-- 4. 갈등·혐오 지수 -->
+        <div style="
+       background:#FAF2E5;
+          opacity: 0.5;
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+          display:flex;
+          flex-direction:column;
+          gap:4px;
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img src="assets/img/Gut_4.svg" alt="갈등·혐오 지수 아이콘"
+                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
+              <span style="font-size:12px; font-weight:600; color:#111827;">
+                갈등·혐오 지수 (염증 로드)
+              </span>
+            </div>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${conflictGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280;">
+            L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
     conflictScore
   )}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
+            ${conflictText}
+          </p>
         </div>
-        <p style="font-size:11px; color:#4b5563; margin:0;">
-          ${conflictText}
-        </p>
-      </div>
 
-      <div style="
-        background:#ffffff;
-        border-radius:14px;
-        padding:12px 14px;
-        box-shadow:0 6px 16px rgba(15,23,42,0.05);
-      ">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <span style="font-size:12px; font-weight:600; color:#111827;">
-            사회적 생산성 / 효율성
-          </span>
-          <span style="
-            font-size:11px;
-            font-weight:700;
-            padding:2px 8px;
-            border-radius:999px;
-            background:#eef2ff;
-            color:#4f46e5;
-          ">${productivityGrade}</span>
+        <!-- 5. 사회적 생산성 -->
+        <div style="
+         background:#FAF2E5;
+          opacity: 0.5;
+          border
+          border-radius:14px;
+          padding:12px 14px;
+          box-shadow:0 6px 16px rgba(15,23,42,0.05);
+          display:flex;
+          flex-direction:column;
+          gap:4px;
+        ">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <img src="assets/img/Gut_5.svg" alt="사회적 생산성 아이콘"
+                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
+              <span style="font-size:12px; font-weight:600; color:#111827;">
+                사회적 생산성 / 효율성
+              </span>
+            </div>
+            <span style="
+              font-size:11px;
+              font-weight:700;
+              padding:2px 8px;
+              border-radius:999px;
+              background:#eef2ff;
+              color:#4f46e5;
+            ">${productivityGrade}</span>
+          </div>
+          <div style="font-size:11px; color:#6b7280;">
+            EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
+          </div>
+          <p style="font-size:11px; color:#4b5563; margin:0;">
+            ${productivityText}
+          </p>
         </div>
-        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">
-          EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
-        </div>
-        <p style="font-size:11px; color:#4b5563; margin:0;">
-          ${productivityText}
-        </p>
       </div>
     </div>
+  `;
 
-    <!-- 🔹 하단 설명 문장 -->
-    <div style="
-      margin-top:8px;
-      font-size:11px;
-      color:#6b7280;
-    ">
-      본 보고서는 귀하의 장내 생태 데이터를 기반으로 산출된 사회 적응 및 기여 지수를 포함합니다.
-    </div>
-  </div>
-`;
+  // 🔹 레이더 그리기
+  setTimeout(() => {
+    drawGutRadar({
+      labels: ["다양성", "규범", "결속", "갈등·혐오", "생산성"],
+      values: [
+        diversityScore,
+        conformityScore,
+        cohesionScore,
+        conflictScore,
+        productivityScore,
+      ],
+    });
+  }, 0);
+}
+
+function drawGutRadar(data) {
+  const canvas = document.getElementById("gutRadar");
+  if (!canvas || !canvas.getContext) return;
+
+  const ctx = canvas.getContext("2d");
+
+  const width = canvas.clientWidth || 260;
+  const height = canvas.clientHeight || 220;
+  canvas.width = width;
+  canvas.height = height;
+
+  const cx = width / 2;
+  const cy = height / 2 + 4; // 살짝 아래로
+  const radius = Math.min(width, height) * 0.36;
+
+  const labels = data.labels;
+  const values = data.values.map((v) => Math.max(0, Math.min(1, v)));
+  const count = labels.length;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.save();
+  ctx.translate(0.5, 0.5); // 비트맵 경계 보정
+
+  // === 그리드 폴리곤 ===
+  const levels = 4;
+  ctx.strokeStyle = "rgba(148,163,184,0.6)";
+  ctx.lineWidth = 1;
+
+  for (let l = 1; l <= levels; l++) {
+    const r = (radius * l) / levels;
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // === 축 라인 + 라벨 ===
+  ctx.font = "11px Sweet, system-ui";
+  ctx.fillStyle = "rgba(148,163,184,0.95)";
+
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+
+    // 축
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    // 라벨 위치
+    const labelRadius = radius + 16;
+    const lx = cx + Math.cos(angle) * labelRadius;
+    const ly = cy + Math.sin(angle) * labelRadius;
+
+    ctx.textAlign =
+      Math.cos(angle) > 0.2
+        ? "left"
+        : Math.cos(angle) < -0.2
+        ? "right"
+        : "center";
+    ctx.textBaseline =
+      Math.sin(angle) > 0.2
+        ? "top"
+        : Math.sin(angle) < -0.2
+        ? "bottom"
+        : "middle";
+
+    ctx.fillText(labels[i], lx, ly);
+  }
+
+  // === 데이터 폴리곤 ===
+  ctx.beginPath();
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
+    const r = radius * values[i];
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+
+  ctx.fillStyle = "rgba(56,189,248,0.25)"; // 채움
+  ctx.strokeStyle = "rgba(56,189,248,0.9)"; // 외곽
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+
+  // 꼭짓점 점 표시
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
+    const r = radius * values[i];
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fill();
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 // -----------------------------
@@ -2015,26 +2257,32 @@ loopInterval = setInterval(mainLoopTick, 1000);
 // -----------------------------
 // 터치 테스트: standby → POSTURE
 // -----------------------------
-let testTriggered = false;
+if (standbyScreenEl) {
+  standbyScreenEl.addEventListener("click", () => {
+    // 이미 한번 넘긴 뒤면 또 안넘어가게 (테스트 버튼으로 초기화 가능)
+    if (testTriggered) return;
 
-standbyScreenEl.addEventListener("click", () => {
-  if (testTriggered) return;
-  if (currentPhase === "A0-1" || currentPhase === "A0-2") {
-    testTriggered = true;
-    setPhase("POSTURE");
-    scanTimer = 0;
-    purity = 0;
-    updateProgress();
-  }
-});
+    if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+      testTriggered = true;
+
+      setPhase("POSTURE");
+      scanTimer = 0;
+      purity = 0;
+      updateProgress();
+    }
+  });
+}
 
 // -----------------------------
 // POSTURE 화면 터치 → 바로 스캔 시작(A1-2)
 // -----------------------------
 if (postureEl) {
-  postureEl.addEventListener("click", () => {
+  postureEl.addEventListener("click", (event) => {
     // 다른 phase에서는 무시
     if (currentPhase !== "POSTURE") return;
+
+    // 🔥 여기서 버블링 막기 (scanRoot 클릭 핸들러로 안 올라가게)
+    event.stopPropagation();
 
     // POSTURE용 타이머/애니메이션 정리
     postureTimers.forEach(clearTimeout);
@@ -2051,5 +2299,34 @@ if (postureEl) {
     // 바로 스캔 phase로 점프
     setPhase("A1-2");
     updateProgress();
+  });
+}
+
+// -----------------------------
+// 스캔 화면 아무 데나 터치 → 바로 결과(C2)로 (테스트용)
+// -----------------------------
+if (scanRootEl) {
+  scanRootEl.addEventListener("click", () => {
+    // ✅ "진짜 스캔 단계"에서만 동작 (POSTURE 제외)
+    const isScanFastJumpPhase =
+      currentPhase === "A1-2" ||
+      currentPhase === "B1" ||
+      currentPhase === "B2" ||
+      currentPhase === "B3" ||
+      currentPhase === "C1";
+
+    if (!isScanFastJumpPhase) return;
+    if (scanResultStarted) return; // 이미 한번 넘어간 상태면 무시
+
+    // 바로 결과 페이지로 점프
+    const profile = createRandomGutProfile();
+    analysisResult = generateAnalysisFromGutProfile(profile);
+
+    scanOverallTimer = SCAN_OVERALL_TOTAL;
+    updateProgress();
+
+    setPhase("C2");
+    renderAnalysisResult();
+    showMicrobes(false);
   });
 }

@@ -619,8 +619,11 @@ function renderComparisonTable() {
 
   comparisonBodyEl.innerHTML = "";
 
-  // 1) 현재 자산 배열을 복사해서
-  const rows = assets
+  const mainAsset = getMainAsset();
+  const mainId = mainAsset ? mainAsset.id : null;
+
+  // 1) 모든 자산을 value 기준으로 정렬 (가치 높은 순)
+  const sorted = assets
     .map((asset) => {
       const m = computeScanParams(asset);
       const delta = asset.value - asset.prevValue;
@@ -630,22 +633,62 @@ function renderComparisonTable() {
       if (delta > 0.05) deltaClass = "up";
       else if (delta < -0.05) deltaClass = "down";
 
-      return {
-        asset,
-        m,
-        delta,
-        deltaLabel,
-        deltaClass,
-      };
+      return { asset, m, delta, deltaLabel, deltaClass };
     })
-    // 2) Value 기준으로 내림차순 정렬 (가치 높은 순)
-    .sort((a, b) => b.asset.value - a.asset.value)
-    // 3) 화면에 보여줄 최대 줄 수만 남기기 (예: 8줄)
-    .slice(0, 8); // ← 여기 숫자 조절하면 화면에 보이는 줄 수 조정 가능
+    .sort((a, b) => b.asset.value - a.asset.value);
 
-  rows.forEach((row) => {
+  // 2) 메인 ID의 현재 순위 찾기
+  const mainIndex = mainId
+    ? sorted.findIndex((row) => row.asset.id === mainId)
+    : -1;
+
+  // 메인 ID가 못 잡혔으면 (이상한 경우) 그냥 상위 8개 보여주기
+  if (mainIndex === -1) {
+    sorted.slice(0, 8).forEach((row) => {
+      const { asset, m, deltaLabel, deltaClass } = row;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${asset.id}</td>
+        <td>${asset.name}</td>
+        <td class="val">${formatNumber(asset.value)}</td>
+        <td class="val ${deltaClass}">${deltaLabel}</td>
+        <td>${asset.theme}</td>
+        <td>${m.contribution}</td>
+        <td>${m.level}</td>
+      `;
+      comparisonBodyEl.appendChild(tr);
+    });
+    return;
+  }
+
+  // 3) 메인 ID를 기준으로 위 / 아래 사람들만 보여주는 윈도우 만들기
+  const WINDOW_ROWS = 7; // 총 몇 줄 보여줄지 (위 3, 자기, 아래 3)
+  const HALF = Math.floor(WINDOW_ROWS / 2);
+
+  let start = mainIndex - HALF;
+  let end = mainIndex + HALF + 1;
+
+  // 범위 보정 (0 이하, 끝 넘어가는 경우)
+  if (start < 0) {
+    start = 0;
+    end = Math.min(WINDOW_ROWS, sorted.length);
+  } else if (end > sorted.length) {
+    end = sorted.length;
+    start = Math.max(0, end - WINDOW_ROWS);
+  }
+
+  const windowRows = sorted.slice(start, end);
+
+  // 4) 테이블 렌더 + 메인 ID 강조
+  windowRows.forEach((row) => {
     const { asset, m, deltaLabel, deltaClass } = row;
     const tr = document.createElement("tr");
+
+    const isMain = asset.id === mainId;
+    if (isMain) {
+      tr.classList.add("is-main-asset");
+    }
+
     tr.innerHTML = `
       <td>${asset.id}</td>
       <td>${asset.name}</td>
@@ -655,6 +698,7 @@ function renderComparisonTable() {
       <td>${m.contribution}</td>
       <td>${m.level}</td>
     `;
+
     comparisonBodyEl.appendChild(tr);
   });
 }

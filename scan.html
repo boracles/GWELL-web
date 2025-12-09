@@ -71,7 +71,7 @@
           </div>
 
           <div class="meta-pair">
-            <span class="meta-label">데이터 처리 등급</span>
+            <span class="meta-label">사회 적응도 등급</span>
             <span class="meta-value meta-value--level" id="metaLevel">LV-</span>
           </div>
         </div>
@@ -117,6 +117,15 @@
       <div class="scan-root" id="scanRoot">
         <div class="scan-main">
           <div class="scan-bg particles" id="scanBg"></div>
+
+          <!-- 🔹 스캔 단계 문장 상단 크게 표시 -->
+          <div class="scan-phase-text" id="scanPhaseText"></div>
+
+          <!-- 🔹 상단 정제율 표시 -->
+          <div class="scan-phase-meta">
+            <span class="scan-phase-meta-label">정제율</span>
+            <span class="scan-phase-meta-value" id="phasePurityValue">0%</span>
+          </div>
 
           <!-- 🔹 3D 미생물 레이어 -->
           <canvas id="scanMicrobes"></canvas>
@@ -233,6 +242,7 @@
             >
               <!-- 왼쪽: 장 이미지 -->
               <div class="scan-result-gut" id="gutVisual">
+                <div class="gut-summary-overlay" id="gutSummaryText"></div>
                 <img
                   id="gutImage"
                   src="assets/img/gut-neutral.png"
@@ -273,19 +283,19 @@
                   <div class="scan-sequence-dots">
                     <div class="scan-step" data-scan-step="0">
                       <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
+                      <span class="scan-step-check">1</span>
                     </div>
                     <div class="scan-step" data-scan-step="1">
                       <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
+                      <span class="scan-step-check">2</span>
                     </div>
                     <div class="scan-step" data-scan-step="2">
                       <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
+                      <span class="scan-step-check">3</span>
                     </div>
                     <div class="scan-step" data-scan-step="3">
                       <span class="scan-step-dot"></span>
-                      <span class="scan-step-check">✔</span>
+                      <span class="scan-step-check">4</span>
                     </div>
                   </div>
                 </div>
@@ -315,6 +325,10 @@
           </div>
         </div>
       </div>
+    </div>
+    <div class="scan-global-footer">
+      본 보고서는 귀하의 장내 생태 데이터를 기반으로 산출된 사회 적응 및 기여
+      지수를 포함합니다.
     </div>
   </body>
 </html>
