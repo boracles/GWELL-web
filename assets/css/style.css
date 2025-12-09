@@ -430,11 +430,11 @@ body {
 
 .scan-progress-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center; /* 너무 아래로 내려가지 않게 */
+  justify-content: flex-start; /* ← 오른쪽 공간 안 쓰게 */
+  align-items: center;
   font-size: 12px;
   opacity: 0.9;
-  margin-bottom: 10px; /* 로딩바와 간격 ↑ */
+  margin-bottom: 10px;
 }
 
 /* ==========================
@@ -466,43 +466,46 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s ease;
+
+  z-index: 10;
 }
 
 /* 상단 안내 문구 아래 정제율 표시 */
 .scan-phase-meta {
   position: absolute;
-  top: 160px; /* 안내 문구(120px) 바로 아래 */
+  top: 180px; /* 네가 쓰고 있는 위치 값에 맞게 조절 */
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-family: "Sweet", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  z-index: 5;
+  display: none; /* 🔥 기본은 절대 안 보이게 */
+  gap: 6px;
+  font-size: 24px;
+  font-weight: 500;
+  color: #fdf6ec;
+  opacity: 0.9;
   pointer-events: none;
+
+  z-index: 11;
 }
 
 .scan-phase-meta-label {
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 500;
   color: #fdf6ec;
   opacity: 0.85;
 }
 
 .scan-phase-meta-value {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 24px;
+  font-weight: 900;
   color: #fdf6ec;
 }
 
 #progressLabel {
-  font-size: 12px;
+  display: none;
 }
 
 #progressTime {
-  font-size: 18px; /* 글자 크게 */
-  font-weight: 700;
-  padding-bottom: 0; /* 로딩바에 붙지 않게 */
+  display: none;
 }
 
 .scan-progress-bar {
@@ -538,7 +541,7 @@ body {
   font-weight: 600;
 }
 #remainingTime {
-  font-size: 15px; /* 여기서 원하는 크기로 조절 (14~16 추천) */
+  font-size: 18px; /* 여기서 원하는 크기로 조절 (14~16 추천) */
   font-weight: 600;
 }
 .scan-buttons-row {
@@ -599,7 +602,7 @@ body {
 .scan-result-layout {
   display: grid;
   grid-template-columns: 520px minmax(0, 1fr); /* 🔸 왼쪽 컬럼 넓게 */
-  gap: 56px;
+  gap: 36px;
   align-items: flex-start;
   margin-top: 24px; /* 🔸 위쪽 여백도 살짝 늘리기 */
 }
@@ -768,7 +771,7 @@ body.result-mode .scan-global-footer {
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  z-index: 20;
+  z-index: 60;
 }
 
 .scan-bg.particles {
@@ -812,21 +815,21 @@ body.result-mode .scan-global-footer {
   position: relative;
   width: 100%;
   margin-top: 0; /* 전체를 약간 위로 */
+  z-index: 61;
 }
-
 /* 🔹 로딩바: 더 두껍게 */
 .scan-sequence-progress-bar {
-  height: 12px; /* 6px → 12px */
+  height: 12px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(18, 12, 26, 1); /* ← posture-progress-bar와 동일 */
   overflow: hidden;
 }
 
 .scan-sequence-progress-inner {
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, #22c55e, #a855f7, #38bdf8);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #6d361a, #3b205c, #a58d80, #6d361a);
+  transition: width 0.6s ease; /* 원하면 0.3으로 놔둬도 되고, 느낌 통일하려면 0.6 */
 }
 
 /* 🔹 점들을 로딩바 위에 올려놓기 */
@@ -853,8 +856,8 @@ body.result-mode .scan-global-footer {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  border: 2px solid rgba(148, 163, 184, 0.9); /* 회색 테두리 */
-  background: rgba(15, 23, 42, 0.95); /* 어두운 회색 배경 */
+  border: none; /* 테두리 제거 */
+  background: rgba(18, 12, 26, 1); /* posture-step-dot 과 동일 */
 }
 
 /* 체크(=숫자) 텍스트 */
@@ -866,19 +869,19 @@ body.result-mode .scan-global-footer {
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  color: rgba(148, 163, 184, 0.95); /* 기본 회색 숫자 */
-  opacity: 1; /* ❗ 항상 보이게 */
+  color: #fdf6ec; /* 밝은 아이보리 */
+  opacity: 1;
   transition: color 0.2s ease;
 }
 
 /* 완료된 스텝: 동그라미 + 숫자 색만 바꾸기 */
 .scan-step.completed .scan-step-dot {
-  border-color: #22c55e;
-  background: #22c55e;
+  border: none;
+  background: #6d361a; /* posture-progress-bar 그라데이션 시작 색 */
 }
 
 .scan-step.completed .scan-step-check {
-  color: #0b1120; /* 초록 배경 위에서 잘 보이는 진한 색 */
+  color: #fdf3e4; /* 살짝 더 따뜻한 톤 */
 }
 
 /* 대기 중 호흡/살짝 흔들리는 느낌 */
@@ -921,12 +924,16 @@ body.result-mode .scan-global-footer {
 /* 스캔 시 나오는 3D 미생물 레이어 */
 #scanMicrobes {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 90px; /* 🔥 하단 90px은 비워두고 그 위까지만 렌더 */
   width: 100%;
-  height: 100%;
+  height: auto;
   pointer-events: none;
   opacity: 0; /* 기본은 숨김 */
   transition: opacity 0.6s ease;
+  z-index: 2; /* 3D는 2단 (바보다 아래) */
 }
 
 /* Scan 페이지에서는 헤더 숨기기 */
@@ -2073,13 +2080,15 @@ body.result-mode .scan-root {
   padding-top: 120px; /* 로고/메타 아래 살짝만 띄우기 */
 }
 
+/* ✅ 결과 모드에서 오른쪽 결과 카드 전체 스케일 줄여서 위로 띄우기 */
+body.result-mode .scan-result-list {
+  transform: scale(0.97); /* 0.90~0.95 사이에서 조정 가능 */
+  transform-origin: top right; /* 오른쪽 위를 기준으로 줄이기 */
+}
+
 /* 🔧 결과 레이아웃 높이 강제하던 설정 해제 */
 body.result-mode .scan-result-layout {
-  height: auto !important;
-  max-height: none !important;
-  margin-bottom: 40px; /* 하단 여유 (원하면 32~60px 사이로 조절) */
-  align-items: flex-start;
-  overflow: visible !important;
+  margin-bottom: 72px; /* 하단 여백. 지금 40px → 72px 정도로 확 늘리기 */
 }
 
 .global-logo-layer {

@@ -39,6 +39,8 @@ const standbyShaderCanvas = document.getElementById("standbyShader");
 const progressRowEl = document.getElementById("progressRow");
 const purityRowEl = document.getElementById("purityRow");
 
+const scanPhaseMetaEl = document.querySelector(".scan-phase-meta");
+
 const scanSequenceProgressInnerEl = document.getElementById(
   "scanSequenceProgressInner"
 );
@@ -386,8 +388,10 @@ let currentScanStep = -1;
 function positionScanSteps() {
   if (!scanStepEls || !scanStepEls.length) return;
 
+  const DOT_COUNT = scanStepEls.length;
+
   scanStepEls.forEach((el, i) => {
-    const ratio = i / (SCAN_STEP_COUNT - 1);
+    const ratio = i / (DOT_COUNT - 1); // 0, 0.25, 0.5, 0.75, 1.0
     el.style.left = `${ratio * 100}%`;
   });
 }
@@ -495,13 +499,14 @@ function setPhase(phase) {
   if (scanSequenceEl) {
     scanSequenceEl.style.display = isScanProgressPhase ? "block" : "none";
   }
-
-  // 🔹 여기 추가
   if (progressRowEl) {
     progressRowEl.style.display = isScanProgressPhase ? "flex" : "none";
   }
   if (purityRowEl) {
     purityRowEl.style.display = isScanProgressPhase ? "flex" : "none";
+  }
+  if (scanPhaseMetaEl) {
+    scanPhaseMetaEl.style.display = isScanProgressPhase ? "flex" : "none";
   }
 
   if (isStandby) {
@@ -541,6 +546,8 @@ function setPhase(phase) {
       if (standbyHintEl) standbyHintEl.style.display = "block";
       if (statusSystemEl) statusSystemEl.textContent = "IDLE";
 
+      if (scanPhaseMetaEl) scanPhaseMetaEl.style.display = "none";
+
       if (phasePurityValueEl) {
         phasePurityValueEl.style.display = "none";
         phasePurityValueEl.textContent = "";
@@ -563,6 +570,8 @@ function setPhase(phase) {
 
     case "A0-2":
       if (statusSystemEl) statusSystemEl.textContent = "READY";
+
+      if (scanPhaseMetaEl) scanPhaseMetaEl.style.display = "none";
 
       if (phasePurityValueEl) {
         phasePurityValueEl.style.display = "none";
@@ -965,6 +974,9 @@ function updateSensorStatus() {
 // -----------------------------
 // 진행바 업데이트 + 스캔 단계 연동
 // -----------------------------
+// -----------------------------
+// 진행바 업데이트 + 스캔 단계 연동
+// -----------------------------
 function updateProgress() {
   // 하단 정제율 숫자
   if (purityValueEl) {
@@ -1015,23 +1027,27 @@ function updateProgress() {
       scanSequenceProgressInnerEl.style.width = `${timeRatio * 100}%`;
     }
 
-    // ✅ "문장" 단계 / 완료 개수 계산
-    let stepIdx = 0;
-    let completedCount = 0;
+    // =============================
+    // ✅ 도트/문장 단계 계산 부분만 정확히 다시 잡기
+    // =============================
 
-    if (scanOverallTimer === 0) {
-      stepIdx = 0;
-      completedCount = 1;
-    } else {
-      if (timeRatio >= 0.25) stepIdx = 1;
-      if (timeRatio >= 0.5) stepIdx = 2;
-      if (timeRatio >= 0.75) stepIdx = 3;
+    // 도트가 켜지는 지점 (로딩바 기준)
+    const THRESHOLDS = [0.0, 0.25, 0.5, 0.75, 1.0];
 
-      if (timeRatio >= 0.25) completedCount = 1;
-      if (timeRatio >= 0.5) completedCount = 2;
-      if (timeRatio >= 0.75) completedCount = 3;
-      if (timeRatio >= 0.999) completedCount = 4;
+    // 기본값: 스캔 시작하면 1번 도트는 항상 ON
+    let completedCount = 1;
+
+    // timeRatio가 각 임계값을 넘을 때마다 도트 하나씩 추가로 켜짐
+    for (let i = 1; i < THRESHOLDS.length; i++) {
+      if (timeRatio >= THRESHOLDS[i]) {
+        completedCount = i + 1; // 도트 번호는 1부터 시작
+      }
     }
+
+    // 문장 인덱스(0~3) = 켜진 도트 개수 - 1
+    let stepIdx = completedCount - 1;
+    if (stepIdx < 0) stepIdx = 0;
+    if (stepIdx >= SCAN_STEP_COUNT) stepIdx = SCAN_STEP_COUNT - 1;
 
     updateScanStepUI(stepIdx, completedCount);
   } else {
@@ -1629,256 +1645,257 @@ function renderAnalysisResult() {
   // === 오른쪽: 6개 박스 (레이더 1 + 카드 5) ===
   resultListEl.style.display = "block";
   resultListEl.innerHTML = `
-    <div class="gut-layout-right-inner"
-         style="display:flex; flex-direction:column; gap:16px; padding-top:24px; height:100%;">
-      
-      <div style="
-        align-self:flex-start;
-        font-size:16px;
-        letter-spacing:0.18em;
-        text-transform:uppercase;
-        color:#FAF2E5;
-        font-weight:700;
-        display:flex;
-        align-items:center;
-        gap:6px;
-      ">
-        <span style="color:${gradeColor};">●</span>
-        <span>장내 생태 기반 사회 적응도 분석 보고서</span>
-      </div>
+<div class="gut-layout-right-inner"
+     style="display:flex; flex-direction:column; gap:14px; padding-top:24px; height:100%;">
+  
+  <!-- 상단 섹션 타이틀 -->
+  <div style="
+    align-self:flex-start;
+    font-size:17px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:#FAF2E5;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  ">
+    <span style="color:${gradeColor};">●</span>
+    <span>장내 생태 기반 사회 적응도 분석 보고서</span>
+  </div>
 
-<div style="
-      flex:1;
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      grid-auto-rows:minmax(0, 1fr); /* 각 줄 높이를 자동으로 꽉 채우기 */
-      gap:10px;
-      min-height:0;
+  <div style="
+    flex:1;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-auto-rows:minmax(0, 1fr);
+    row-gap:10px;
+    column-gap:12px;
+    min-height:0;
+  ">
+
+    <!-- 0. 레이더 카드 (예전 높이로) -->
+    <div style="
+      background:#ffffff;
+      border-radius:12px;
+      padding:10px 12px 12px 12px;
+      box-shadow:0 4px 12px rgba(15,23,42,0.06);
+      display:flex;
+      flex-direction:column;
+      gap:6px;
     ">
-
-<!-- 0. 레이더 카드 (한 칸짜리, 더 낮게) -->
-<div style="
-  background:#ffffff;
-  border-radius:12px;
-  padding:8px 10px 10px 10px;
-  box-shadow:0 4px 10px rgba(15,23,42,0.06);
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-">
-
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:12px; font-weight:600; color:#111827;">
-              장내 사회 지표 레이더
-            </div>
-            <div style="display:flex; gap:8px; font-size:10px; color:#6b7280;">
-              <div style="display:flex; align-items:center; gap:4px;">
-                <span style="width:10px;height:10px;border-radius:999px;background:#38bdf8;display:inline-block;"></span>
-                <span>현재 프로파일</span>
-              </div>
-            </div>
-          </div>
-          <div style="font-size:11px; color:#6b7280;">
-            장내 다양성, 규범 적합도, 결속 에너지, 갈등·혐오 지수, 사회적 생산성을 한눈에 요약한 그래프입니다.
-          </div>
-          <div style="position:relative; flex:1; min-height:180px;">
-            <canvas id="gutRadar"
-              style="width:100%;height:100%;display:block;"></canvas>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:13px; font-weight:700; color:#111827;">
+          장내 사회 지표 레이더
+        </div>
+        <div style="display:flex; gap:6px; font-size:11px; color:#6b7280;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="width:10px;height:10px;border-radius:999px;background:#38bdf8;display:inline-block;"></span>
+            <span>현재 프로파일</span>
           </div>
         </div>
-
-        <!-- 1. 다양성 -->
-        <div style="
-          background:#FAF2E5;
-          opacity: 0.5;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-          display:flex;
-          flex-direction:column;
-          gap:4px;
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <img src="assets/img/Gut_1.svg" alt="장내 다양성 아이콘"
-                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
-              <span style="font-size:12px; font-weight:600; color:#111827;">
-                장내 다양성 & 정상성의 폭
-              </span>
-            </div>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${diversityGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280;">
-            D = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${diversityText}
-          </p>
-        </div>
-
-        <!-- 2. 규범 적합도 -->
-        <div style="
-          background:#FAF2E5;
-          opacity: 0.5;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-          display:flex;
-          flex-direction:column;
-          gap:4px;
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <img src="assets/img/Gut_2.svg" alt="규범 적합도 아이콘"
-                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
-              <span style="font-size:12px; font-weight:600; color:#111827;">
-                규범 적합도 (순응 점수)
-              </span>
-            </div>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${conformityGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280;">
-            B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
-    conformityScore
-  )}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${conformityText}
-          </p>
-        </div>
-
-        <!-- 3. 결속 에너지 -->
-        <div style="
-      background:#FAF2E5;
-          opacity: 0.5;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-          display:flex;
-          flex-direction:column;
-          gap:4px;
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <img src="assets/img/Gut_3.svg" alt="결속 에너지 아이콘"
-                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
-              <span style="font-size:12px; font-weight:600; color:#111827;">
-                공동체 결속 에너지 (SCFA)
-              </span>
-            </div>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${cohesionGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280;">
-            Bt = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${cohesionText}
-          </p>
-        </div>
-
-        <!-- 4. 갈등·혐오 지수 -->
-        <div style="
-       background:#FAF2E5;
-          opacity: 0.5;
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-          display:flex;
-          flex-direction:column;
-          gap:4px;
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <img src="assets/img/Gut_4.svg" alt="갈등·혐오 지수 아이콘"
-                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
-              <span style="font-size:12px; font-weight:600; color:#111827;">
-                갈등·혐오 지수 (염증 로드)
-              </span>
-            </div>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${conflictGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280;">
-            L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
-    conflictScore
-  )}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${conflictText}
-          </p>
-        </div>
-
-        <!-- 5. 사회적 생산성 -->
-        <div style="
-         background:#FAF2E5;
-          opacity: 0.5;
-          border
-          border-radius:14px;
-          padding:12px 14px;
-          box-shadow:0 6px 16px rgba(15,23,42,0.05);
-          display:flex;
-          flex-direction:column;
-          gap:4px;
-        ">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <img src="assets/img/Gut_5.svg" alt="사회적 생산성 아이콘"
-                   style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" />
-              <span style="font-size:12px; font-weight:600; color:#111827;">
-                사회적 생산성 / 효율성
-              </span>
-            </div>
-            <span style="
-              font-size:11px;
-              font-weight:700;
-              padding:2px 8px;
-              border-radius:999px;
-              background:#eef2ff;
-              color:#4f46e5;
-            ">${productivityGrade}</span>
-          </div>
-          <div style="font-size:11px; color:#6b7280;">
-            EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
-          </div>
-          <p style="font-size:11px; color:#4b5563; margin:0;">
-            ${productivityText}
-          </p>
-        </div>
+      </div>
+      <div style="font-size:12px; color:#6b7280; line-height:1.5;">
+        정상성 스펙트럼, 규범 순응도, 공동체 유지 에너지, 사회 염증 지수, 사회 대사 효율을 요약한 그래프입니다.
+      </div>
+      <div style="position:relative; flex:1; min-height:170px;">
+        <canvas id="gutRadar" style="width:100%;height:100%;display:block;"></canvas>
       </div>
     </div>
-  `;
+
+    <!-- 1. 정상성 스펙트럼 -->
+    <div style="
+      background:#FAF2E5;
+      opacity:0.7;
+      border-radius:12px;
+      padding:10px 12px 12px 12px;
+      box-shadow:0 4px 12px rgba(15,23,42,0.05);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <img src="assets/img/Gut_1.svg" style="width:28px;height:28px;" />
+          <span style="font-size:13px; font-weight:700; color:#111827;">
+            정상성 스펙트럼
+          </span>
+        </div>
+        <span style="
+          font-size:12px;
+          font-weight:800;
+          padding:2px 8px;
+          border-radius:999px;
+          background:#eef2ff;
+          color:#4f46e5;
+        ">${diversityGrade}</span>
+      </div>
+      <div style="font-size:12px; color:#6b7280;">
+        다양성 = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
+      </div>
+      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
+        ${diversityText}
+      </p>
+    </div>
+
+    <!-- 2. 규범 순응도 -->
+    <div style="
+      background:#FAF2E5;
+      opacity:0.7;
+      border-radius:12px;
+      padding:10px 12px 12px 12px;
+      box-shadow:0 4px 12px rgba(15,23,42,0.05);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <img src="assets/img/Gut_2.svg" style="width:28px;height:28px;" />
+          <span style="font-size:13px; font-weight:700; color:#111827;">
+            규범 순응도
+          </span>
+        </div>
+        <span style="
+          font-size:12px;
+          font-weight:800;
+          padding:2px 8px;
+          border-radius:999px;
+          background:#eef2ff;
+          color:#4f46e5;
+        ">${conformityGrade}</span>
+      </div>
+      <div style="font-size:12px; color:#6b7280;">
+        B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
+    conformityScore
+  )}
+      </div>
+      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
+        ${conformityText}
+      </p>
+    </div>
+
+    <!-- 3. 공동체 유지 에너지 -->
+    <div style="
+      background:#FAF2E5;
+      opacity:0.7;
+      border-radius:12px;
+      padding:10px 12px 12px 12px;
+      box-shadow:0 4px 12px rgba(15,23,42,0.05);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <img src="assets/img/Gut_3.svg" style="width:28px;height:28px;" />
+          <span style="font-size:13px; font-weight:700; color:#111827;">
+            공동체 유지 에너지
+          </span>
+        </div>
+        <span style="
+          font-size:12px;
+          font-weight:800;
+          padding:2px 8px;
+          border-radius:999px;
+          background:#eef2ff;
+          color:#4f46e5;
+        ">${cohesionGrade}</span>
+      </div>
+      <div style="font-size:12px; color:#6b7280;">
+        SCFA = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
+      </div>
+      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
+        ${cohesionText}
+      </p>
+    </div>
+
+    <!-- 4. 사회 염증 지수 -->
+    <div style="
+      background:#FAF2E5;
+      opacity:0.7;
+      border-radius:12px;
+      padding:10px 12px 12px 12px;
+      box-shadow:0 4px 12px rgba(15,23,42,0.05);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <img src="assets/img/Gut_4.svg" style="width:28px;height:28px;" />
+          <span style="font-size:13px; font-weight:700; color:#111827;">
+            사회 염증 지수
+          </span>
+        </div>
+        <span style="
+          font-size:12px;
+          font-weight:800;
+          padding:2px 8px;
+          border-radius:999px;
+          background:#eef2ff;
+          color:#4f46e5;
+        ">${conflictGrade}</span>
+      </div>
+      <div style="font-size:12px; color:#6b7280;">
+        L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
+    conflictScore
+  )}
+      </div>
+      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
+        ${conflictText}
+      </p>
+    </div>
+
+    <!-- 5. 사회 대사 효율 -->
+    <div style="
+      background:#FAF2E5;
+      opacity:0.7;
+      border-radius:12px;
+      padding:10px 12px 12px 12px;
+      box-shadow:0 4px 12px rgba(15,23,42,0.05);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <img src="assets/img/Gut_5.svg" style="width:28px;height:28px;" />
+          <span style="font-size:13px; font-weight:700; color:#111827;">
+            사회 대사 효율
+          </span>
+        </div>
+        <span style="
+          font-size:12px;
+          font-weight:800;
+          padding:2px 8px;
+          border-radius:999px;
+          background:#eef2ff;
+          color:#4f46e5;
+        ">${productivityGrade}</span>
+      </div>
+      <div style="font-size:12px; color:#6b7280;">
+        EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
+      </div>
+      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
+        ${productivityText}
+      </p>
+    </div>
+
+  </div>
+</div>
+`;
 
   // 🔹 레이더 그리기
   setTimeout(() => {
     drawGutRadar({
-      labels: ["다양성", "규범", "결속", "갈등·혐오", "생산성"],
+      labels: [
+        "정상성 스펙트럼",
+        "규범 순응도",
+        "공동체 유지",
+        "사회 염증",
+        "대사 효율",
+      ],
       values: [
         diversityScore,
         conformityScore,
