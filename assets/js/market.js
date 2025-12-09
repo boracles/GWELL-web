@@ -673,22 +673,37 @@ function clamp01(x) {
   return x;
 }
 
-// ✅ 뉴스에 따라 가격 + 정상성 지수 둘 다 움직이는 버전 (단순)
+// ✅ 뉴스에 따라 가격 + 정상성 지수 둘 다 움직이는 버전 (리얼 주가 느낌, 범위 넓힘)
 function updateAssetValues(issue) {
   assets.forEach((asset) => {
-    // 1) 가격 업데이트
-    asset.prevValue = asset.value;
+    // ---- 1) 가격(종가) 업데이트 ----
+    const prevPrice = asset.value;
+    asset.prevValue = prevPrice;
 
     const themeWeight = issue ? issue.weightMap[asset.theme] ?? 0 : 0;
 
-    // 예전 느낌: 기본 랜덤 ±4 + 이슈 영향
-    const baseNoise = (Math.random() - 0.5) * 4; // -2 ~ +2
-    const issueImpact = themeWeight * 5; // 테마 영향
-    const delta = baseNoise + issueImpact;
+    // 🔥 자산마다 "느린 추세" 상태 유지 (계속 누적되는 방향감)
+    if (typeof asset.trend !== "number") asset.trend = 0;
 
-    asset.value = Math.max(1, asset.value + delta);
+    // 테마에 따라 추세를 밀어주고, 약간씩만 감쇠
+    asset.trend = asset.trend * 0.9 + themeWeight * 0.6;
 
-    // 2) 정상성 지수 drift (0~1)
+    // 🔥 변동성 크게: 기본+뉴스 영향
+    const baseVol = 1.2; // 숫자 키우면 더 출렁
+    const newsVol = 1.8 + Math.abs(themeWeight) * 4;
+
+    const noise = (Math.random() - 0.5) * baseVol * newsVol * 2; // -X ~ +X
+    const delta = noise + asset.trend; // 랜덤 + 추세
+
+    let nextPrice = prevPrice + delta;
+
+    // 너무 바닥/천장 안 가게 한 번만 클램프
+    if (nextPrice < 20) nextPrice = 20;
+    if (nextPrice > 180) nextPrice = 180;
+
+    asset.value = nextPrice;
+
+    // ---- 2) 정상성 지수 drift (기존 그대로) ----
     if (typeof asset.socialIndex !== "number") {
       asset.socialIndex = asset.baseIndex ?? 0.5;
     }
@@ -759,11 +774,11 @@ function renderTicker() {
   tickerPriceEl.classList.remove("up", "down");
   tickerRateEl.classList.remove("up", "down");
 
-  if (delta > 0.05) {
+  if (delta > 0.03) {
     tickerDeltaEl.classList.add("up");
     tickerPriceEl.classList.add("up");
     tickerRateEl.classList.add("up");
-  } else if (delta < -0.05) {
+  } else if (delta < -0.03) {
     tickerDeltaEl.classList.add("down");
     tickerPriceEl.classList.add("down");
     tickerRateEl.classList.add("down");
@@ -778,27 +793,24 @@ function renderTicker() {
   stat52LowEl.textContent = globalLow !== null ? formatNumber(globalLow) : "-";
 }
 
-// ====== 스캔 파라미터(정제율/효율/기여도/등급) ======
 function computeScanParams(asset) {
   const p = asset.P ?? 0.5;
   const purity = Math.round((1 - p) * 100);
 
+  // 효율: 값이 있으면 E, 없으면 가격에서 대충 환산
   const effRaw = typeof asset.E === "number" ? asset.E : asset.value / 100;
   const efficiency = effRaw.toFixed(2);
 
-  const sni = typeof asset.socialIndex === "number" ? asset.socialIndex : 0.5;
-  const score100 = Math.max(0, Math.min(1, sni)) * 100;
+  // ✅ 정상성 지수(0~100)를 기준으로 거래등급/레벨 계산
+  const idx = computeNormalityIndex(asset); // 0~100
+  const level = Math.round(idx); // 0~100 숫자 (사회 적응도 지수)
 
-  // 🔹 “스캔 시점 등급” (고정용)
   let contribution;
-  if (score100 >= 85) contribution = "A+";
-  else if (score100 >= 70) contribution = "A";
-  else if (score100 >= 55) contribution = "B+";
-  else if (score100 >= 40) contribution = "B";
+  if (idx >= 85) contribution = "A+";
+  else if (idx >= 70) contribution = "A";
+  else if (idx >= 55) contribution = "B+";
+  else if (idx >= 40) contribution = "B";
   else contribution = "C";
-
-  // 🔥 레벨 = 사회 적응도 점수 (0~100) 숫자
-  const level = Math.round(score100);
 
   return { purity, efficiency, contribution, level };
 }
@@ -1039,8 +1051,8 @@ function renderComparisonTable() {
     // 🔹 강점 지표 (이름 + 숫자)
     const strongest = getStrongestMetric(asset); // { label, score }
 
-    // 🔹 스캔 시점 등급
-    const grade = asset.initialGrade || scan.contribution;
+    // 🔥 항상 “현재 정상성 지수 기준 거래등급” 사용
+    const grade = scan.contribution;
 
     // 🔹 등급 색 클래스 매핑 (A*, B*, 나머지 = C 계열)
     let gradeClass = "grade-C";
@@ -1181,6 +1193,7 @@ function initPriceChart() {
 
   candleData = [];
   lineData = [];
+  closeHistory = [];
   volumeData = [];
 
   const ctx = canvas.getContext("2d");
@@ -1264,30 +1277,59 @@ function initPriceChart() {
 
 function appendCandle() {
   const asset = getMainAsset();
+  if (!asset) return;
 
-  const open = asset.prevValue;
+  // 0) 직전 종가, 이번 종가
+  const lastClose = asset.prevValue != null ? asset.prevValue : asset.value;
   const close = asset.value;
 
-  const baseHigh = Math.max(open, close);
-  const baseLow = Math.min(open, close);
+  // 이번 틱에서 실제 가격이 얼마나 움직였는지
+  const rawDelta = close - lastClose;
+  const moveMag = Math.max(Math.abs(rawDelta), 0.3); // 최소 움직임 보정
 
-  // 🔥 꼬리 길이 (0 ~ 0.8 정도)
-  const wiggle = Math.random() * 0.8;
+  let open;
 
-  const high = baseHigh + wiggle;
-  const low = baseLow - wiggle;
+  // 1) 시가를 "이전 종가 주변에서 약간 떨어진 값"으로 만든다
+  if (rawDelta >= 0) {
+    // 🔼 실제 가격은 올라감 → 초록 캔들: close > open 이어야 함
+    const base = lastClose + (Math.random() - 0.5) * moveMag; // 이전 종가 주변
+    const maxOpen = close - moveMag * 0.2; // 종가보다 약간 아래까지만 허용
+    open = Math.min(base, maxOpen);
+  } else {
+    // 🔻 실제 가격은 내려감 → 빨간 캔들: close < open 이어야 함
+    const base = lastClose + (Math.random() - 0.5) * moveMag;
+    const minOpen = close + moveMag * 0.2; // 종가보다 약간 위까지만 허용
+    open = Math.max(base, minOpen);
+  }
 
+  // 혹시 NaN 같은 이상값 생기면 안전하게 보정
+  if (!Number.isFinite(open)) open = lastClose;
+
+  // 2) 몸통 상/하단
+  const bodyHigh = Math.max(open, close);
+  const bodyLow = Math.min(open, close);
+
+  // 몸통 크기에 비례해서 꼬리 길이 결정
+  const bodyRange = Math.max(Math.abs(close - open), 0.2);
+  const upperWick = bodyRange * (0.3 + Math.random() * 0.7);
+  const lowerWick = bodyRange * (0.3 + Math.random() * 0.7);
+
+  const high = bodyHigh + upperWick;
+  const low = bodyLow - lowerWick;
+
+  // 3) 전체 최댓값/최솟값 갱신
   globalHigh = globalHigh === null ? high : Math.max(globalHigh, high);
   globalLow = globalLow === null ? low : Math.min(globalLow, low);
 
-  // 🔹 변화량 기준 의사 거래량 + 방향
-  const { delta } = computeChangeRate(asset);
-  let vol = Math.abs(delta) * 10 + 5; // 0~100 근처로 대충 늘려줌
-  vol = Math.min(vol, 100);
+  // 4) 방향/거래량: 시가·종가 기준 (티커와 일치)
+  const delta = close - open;
   const dir = delta >= 0 ? "up" : "down";
+  let vol = Math.abs(delta) * 15 + 8;
+  vol = Math.min(vol, 120);
 
+  // 5) 차트 데이터 push
   candleData.push({ x: tick, o: open, h: high, l: low, c: close });
-  lineData.push({ x: tick, y: close });
+  lineData.push({ x: tick, y: close }); // 보라 라인은 그냥 종가
   volumeData.push({ x: tick, y: vol, dir });
 
   if (candleData.length > MAX_CANDLES) candleData.shift();
@@ -1300,38 +1342,48 @@ function updatePriceChart() {
 
   // 데이터 반영
   priceChart.data.datasets[0].data = candleData; // 캔들
-  priceChart.data.datasets[1].data = lineData; // 종가 라인
+  priceChart.data.datasets[1].data = lineData; // (이동평균) 라인
 
-  // 🔥 y축을 "보이는 캔들들의 low~high" 기준으로 자동 스케일링
-  if (candleData.length > 0) {
-    let minVal = Infinity;
-    let maxVal = -Infinity;
+  // 🔹 x축: 최신 tick이 항상 오른쪽에 오도록 슬라이딩 윈도우
+  const WINDOW_SIZE = 60;
+  const xScaleOpts = priceChart.options.scales.x;
 
-    for (const c of candleData) {
-      if (typeof c.l === "number" && c.l < minVal) minVal = c.l;
-      if (typeof c.h === "number" && c.h > maxVal) maxVal = c.h;
-    }
-
-    if (Number.isFinite(minVal) && Number.isFinite(maxVal)) {
-      let range = maxVal - minVal;
-
-      // range가 너무 작으면 최소 폭 강제 (상장 직후 같은 경우)
-      if (range < 1) {
-        range = 1;
-        const mid = (minVal + maxVal) / 2;
-        minVal = mid - range / 2;
-        maxVal = mid + range / 2;
-      }
-
-      const padding = range * 0.15; // 위·아래 15% 여백
-
-      const yScale = priceChart.options.scales.yPrice;
-      yScale.min = minVal - padding;
-      yScale.max = maxVal + padding;
-    }
+  if (tick <= WINDOW_SIZE) {
+    xScaleOpts.min = 0;
+    xScaleOpts.max = WINDOW_SIZE;
+  } else {
+    xScaleOpts.min = tick - WINDOW_SIZE;
+    xScaleOpts.max = tick;
   }
 
-  priceChart.update();
+  // 🔹 y축: "지금 화면에 보이는 캔들들"의 high/low 기준으로 스케일
+  const yScaleOpts = priceChart.options.scales.yPrice;
+
+  let visMin = Infinity;
+  let visMax = -Infinity;
+  const xmin = xScaleOpts.min;
+  const xmax = xScaleOpts.max;
+
+  for (const c of candleData) {
+    if (c.x < xmin || c.x > xmax) continue;
+    if (c.l < visMin) visMin = c.l;
+    if (c.h > visMax) visMax = c.h;
+  }
+
+  // 혹시 초기 몇 틱에서 데이터가 거의 없을 때 대비
+  if (!Number.isFinite(visMin) || !Number.isFinite(visMax)) {
+    visMin = globalLow != null ? globalLow : 0;
+    visMax = globalHigh != null ? globalHigh : 1;
+  }
+
+  let range = visMax - visMin;
+  if (range < 1) range = 1;
+
+  const padding = range * 0.2; // 위/아래 여백 20%
+  yScaleOpts.min = visMin - padding;
+  yScaleOpts.max = visMax + padding;
+
+  priceChart.update("none");
 }
 
 function initVolumeChart() {
