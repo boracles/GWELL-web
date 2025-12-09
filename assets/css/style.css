@@ -1748,7 +1748,7 @@ body.result-mode .scan-global-footer {
   background: rgba(15, 23, 42, 0.9);
   border-radius: 16px;
   border: 1px solid var(--border-soft);
-  padding: 10px 8px 12px;
+  padding: 0;
   height: 320px;
 }
 
@@ -2308,9 +2308,10 @@ body.result-mode .scan-global-footer {
 .chart-main-top,
 .chart-main-bottom {
   flex: 1;
-  padding: 0;
-  margin: 0;
+  margin: 0; /* 🔥 위·아래 마진 제거 */
+  padding: 0; /* 🔥 패딩 제거 */
   background: transparent;
+  border: 0;
 }
 
 .chart-main-top canvas,
@@ -2324,7 +2325,7 @@ body.result-mode .scan-global-footer {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 0; /* 🔹 여기 간격도 0 */
+  gap: 0;
   min-height: 0;
 }
 
@@ -2358,33 +2359,46 @@ body.result-mode .scan-global-footer {
   background: transparent;
 }
 
-/* 아래: 정상성 지수 인디케이터 높이 */
 .chart-indicator {
   flex: 0 0 70px;
   min-height: 60px;
   background: transparent;
-  margin-top: 0; /* 🔹 여백 제거 */
+  margin: 0; /* 🔥 위/아래 여백 다 제거 */
+  padding: 0; /* 🔥 패딩도 0 */
+  position: relative; /* 🔥 라벨을 위에 띄우기 위한 기준 */
 }
 
 /* 세 개 차트 캔버스의 가로폭/정렬 완전 통일 */
 #priceChart,
 #volumeChart,
 #indicatorChart {
-  display: block; /* inline 여백 제거 */
+  display: block;
   width: 100% !important;
+  height: 100% !important;
+  margin: 0; /* 🔥 캔버스 마진 제거 */
+  padding: 0;
 }
 
-/* 캔들/볼륨/정상성 차트 컨테이너도 같은 폭 */
 .chart-main-top,
 .chart-main-bottom,
 .chart-indicator {
   position: relative;
   width: 100%;
+  margin: 0;
+  padding: 0; /* 🔥 여기도 0으로 */
 }
 
 .indicator-label {
-  font-size: 11px;
-  opacity: 0.75;
+  position: absolute; /* 🔥 캔버스 위에 얹기 */
+  top: 4px; /* 위에서 살짝만 띄우고 */
+  left: 8px; /* 왼쪽 여백 조금 */
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 1;
+  pointer-events: none; /* 그래프 터치/마우스 방해 안 하게 */
+  margin: 0; /* 🔥 라벨이 줄 차지하지 않도록 */
+  padding: 0;
+  z-index: 2;
 }
 
 .chart-indicator canvas {
@@ -2908,21 +2922,21 @@ body.listing-complete #subMessage {
 /* 장내 자산 상대 가치 분포 – 강점 지표 셀 레이아웃 */
 .comparison-table td.metric-cell {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 6px;
+  justify-content: flex-start; /* 🔥 space-between 제거 */
 }
 
-/* 지표 이름: 고정 폭(예: 9em)으로 통일 */
+/* 지표 이름: 고정 폭은 유지하지만 너무 넓지 않게 */
 .metric-label {
-  flex: 0 0 9em; /* 숫자 조절해서 네 눈에 맞게, 8~11em 정도 */
-  white-space: nowrap; /* 줄바꿈 방지 */
+  display: inline-block;
+  min-width: 8.8em; /* 🔥 필요하면 6.5~8em 사이로만 조정해서 맞추면 됨 */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 숫자(%)는 오른쪽 정렬 */
+/* 숫자는 바로 옆에 붙게 */
 .metric-score {
-  flex: 0 0 auto;
+  margin-left: 4px; /* 🔥 글자와 수치 사이 간격 (2~6px 안에서 조정) */
   font-variant-numeric: tabular-nums;
 }

@@ -753,7 +753,32 @@ function computeStrengthMetrics(asset) {
   return { normality, conformity, cohesion, lowInflamm, metabolism };
 }
 
-// 이 자산의 "강점 지표 이름 + 퍼센트" 문자열 생성
+// 이슈(테마 4개)를 스캔 지표 5개 영향으로 매핑
+function computeIssueMetricImpact(issue) {
+  const w = issue.weightMap || {};
+  const care = w["돌봄"] ?? 0;
+  const prod = w["생산성"] ?? 0;
+  const norm = w["순응/정상성"] ?? 0;
+  const resist = w["저항"] ?? 0;
+
+  return {
+    // 정상성 스펙트럼: 순응↑, 저항↓
+    "정상성 스펙트럼": norm - resist * 0.6,
+
+    // 규범 순응도: 순응↑, 저항↓, 생산성↑(조금)
+    "규범 순응도": norm * 0.8 + prod * 0.2 - resist * 0.7,
+
+    // 공동체 유지 에너지: 돌봄↑, 저항↑(조금), 생산성↓
+    "공동체 유지 에너지": care * 0.8 + resist * 0.2 - prod * 0.3,
+
+    // 사회 염증 지수: 생산성↑, 저항↑, 돌봄↓  (염증이 “불편/갈등” 느낌)
+    "사회 염증 지수": prod * 0.6 + resist * 0.8 - care * 0.5,
+
+    // 사회 대사 효율: 생산성↑, 순응↑, 저항↓
+    "사회 대사 효율": prod * 0.9 + norm * 0.3 - resist * 0.4,
+  };
+}
+
 // 이 자산의 "강점 지표 이름 + 퍼센트"를 분리해서 반환
 function getStrongestMetric(asset) {
   const m = computeStrengthMetrics(asset);
@@ -806,7 +831,6 @@ function renderComparisonTable() {
 
   if (sorted.length === 0) return;
 
-  // 🔥 현재 분포에서 상대 레벨(0~100) 계산용
   const maxVal = sorted[0].asset.value;
   const minVal = sorted[sorted.length - 1].asset.value;
   const span = Math.max(maxVal - minVal, 1);
@@ -815,7 +839,6 @@ function renderComparisonTable() {
     return ((v - minVal) / span) * 100; // 0~100
   }
 
-  // 2) 메인 ID 위치 찾기
   const mainIndex = mainId
     ? sorted.findIndex((row) => row.asset.id === mainId)
     : -1;
@@ -841,23 +864,26 @@ function renderComparisonTable() {
     windowRows = sorted.slice(start, end);
   }
 
-  // 3) 테이블 렌더
   windowRows.forEach(({ asset, scan, deltaLabel, deltaClass }) => {
     const tr = document.createElement("tr");
 
     const isMain = asset.id === mainId;
     if (isMain) tr.classList.add("is-main-asset");
 
-    // 🔹 강점 지표 (이름 + 숫자 분리)
+    // 🔹 강점 지표 (이름 + 숫자)
     const strongest = getStrongestMetric(asset); // { label, score }
 
-    // 🔹 스캔 시점 등급 (A+/A/B+/B/C 유지)
+    // 🔹 스캔 시점 등급
     const grade = asset.initialGrade || scan.contribution;
 
-    // 🔹 상대 레벨 (현재 value 기준)
+    // 🔹 등급 색 클래스 매핑 (A*, B*, 나머지 = C 계열)
+    let gradeClass = "grade-C";
+    if (grade.startsWith("A")) gradeClass = "grade-A";
+    else if (grade.startsWith("B")) gradeClass = "grade-B";
+
+    // 🔹 상대 레벨
     const relLevel = getRelativeLevel(asset.value);
 
-    // 🔹 레벨 색: 3등분 (0~33 / 33~66 / 66~100)
     let levelClass = "";
     if (relLevel >= 66) levelClass = "level-high";
     else if (relLevel >= 33) levelClass = "level-mid";
@@ -871,7 +897,7 @@ function renderComparisonTable() {
       </td>
       <td class="val val-price">${formatNumber(asset.value)}</td>
       <td class="val ${deltaClass}">${deltaLabel}</td>
-      <td>${grade}</td>
+      <td class="${gradeClass}">${grade}</td>
       <td class="val ${levelClass}">${relLevel.toFixed(1)}</td>
     `;
 
@@ -882,35 +908,45 @@ function renderComparisonTable() {
 function buildIssueImpactSummary(issue) {
   if (!issue) return "";
 
-  const up = [];
-  const down = [];
+  const metrics = computeIssueMetricImpact(issue);
 
-  THEMES.forEach((theme) => {
-    const w = issue.weightMap[theme] ?? 0;
-    if (w > 0.1) up.push(theme); // 가치 상승
-    else if (w < -0.1) down.push(theme); // 가치 하락
+  let bestUp = null; // { label, value }
+  let bestDown = null; // { label, value }
+
+  Object.entries(metrics).forEach(([label, v]) => {
+    // 상승 후보
+    if (v > 0.12) {
+      if (!bestUp || v > bestUp.value) {
+        bestUp = { label, value: v };
+      }
+    }
+    // 하락 후보
+    if (v < -0.12) {
+      if (!bestDown || v < bestDown.value) {
+        bestDown = { label, value: v };
+      }
+    }
   });
 
-  if (up.length === 0 && down.length === 0) return "";
+  if (!bestUp && !bestDown) return "";
 
   const parts = [];
 
-  if (up.length > 0) {
+  // ▲ 하나만
+  if (bestUp) {
     parts.push(
-      `<span class="issue-impact-up" style="color:${COLOR_UP};">가치 상승: ${up.join(
-        ", "
-      )}</span>`
-    );
-  }
-  if (down.length > 0) {
-    parts.push(
-      `<span class="issue-impact-down" style="color:${COLOR_DOWN};">가치 하락: ${down.join(
-        ", "
-      )}</span>`
+      `<span class="issue-impact-up" style="color:${COLOR_UP};">▲ ${bestUp.label}</span>`
     );
   }
 
-  return parts.join(" · ");
+  // ▼ 하나만
+  if (bestDown) {
+    parts.push(
+      `<span class="issue-impact-down" style="color:${COLOR_DOWN};">▼ ${bestDown.label}</span>`
+    );
+  }
+
+  return parts.join("   "); // 사이 간격
 }
 
 function renderIssue(issue) {
@@ -925,15 +961,12 @@ function renderIssue(issue) {
 
   const impactSummary = buildIssueImpactSummary(issue);
 
-  // 🔥 뉴스 원문 + 영향 요약을 같이 표시 (요약은 색깔 span)
   if (impactSummary) {
     issueTextEl.innerHTML = `
       <span class="issue-main-text">${issue.text}</span>
-      <span class="issue-impact-sep"> / </span>
-      <span class="issue-impact">${impactSummary}</span>
+      ${impactSummary}
     `;
   } else {
-    // 영향 요약 없으면 기존처럼 텍스트만
     issueTextEl.textContent = issue.text;
   }
 }
@@ -1029,6 +1062,9 @@ function initPriceChart() {
       scales: {
         x: {
           type: "linear",
+          offset: false,
+          min: 0, // 🔥 캔들이랑 동일
+          max: 60,
           ticks: {
             display: false,
             stepSize: GRID_X_STEP, // ✅ 세로 그리드 위치 고정 (0,10,20,...)
@@ -1037,6 +1073,7 @@ function initPriceChart() {
             color: "rgba(148,163,184,0.28)",
             drawOnChartArea: true,
           },
+          border: { display: false },
           offset: false,
           min: 0,
           max: 60,
@@ -1049,6 +1086,7 @@ function initPriceChart() {
             count: GRID_Y_TICKS_PRICE, // ★ 12줄
           },
           grid: { color: "rgba(148,163,184,0.3)" },
+          border: { display: false },
           afterFit(scale) {
             scale.width = RIGHT_AXIS_WIDTH;
           },
@@ -1078,7 +1116,8 @@ function appendCandle() {
 
   // 🔹 변화량 기준 의사 거래량 + 방향
   const { delta } = computeChangeRate(asset);
-  const vol = Math.abs(delta) + 1;
+  let vol = Math.abs(delta) * 10 + 5; // 0~100 근처로 대충 늘려줌
+  vol = Math.min(vol, 100);
   const dir = delta >= 0 ? "up" : "down";
 
   candleData.push({ x: tick, o: open, h: high, l: low, c: close });
@@ -1095,17 +1134,6 @@ function updatePriceChart() {
 
   priceChart.data.datasets[0].data = candleData; // 캔들
   priceChart.data.datasets[1].data = lineData; // 종가 라인
-
-  if (candleData.length > 0) {
-    const lastX = candleData[candleData.length - 1].x;
-    const WINDOW = 60;
-
-    const xScale = priceChart.options.scales.x;
-
-    // 🔥 항상 0에서 시작, 오른쪽으로만 확장
-    xScale.min = 0;
-    xScale.max = Math.max(WINDOW, lastX + 1);
-  }
 
   priceChart.update();
 }
@@ -1150,33 +1178,38 @@ function initVolumeChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: { padding: 0 },
-      plugins: {
-        legend: { display: false },
-      },
+      plugins: { legend: { display: false } },
       scales: {
         x: {
           type: "linear",
+          offset: false,
+          min: 0, // 🔥 캔들/정상성과 완전히 동일
+          max: 60,
           ticks: {
             display: false,
-            stepSize: GRID_X_STEP, // ✅ 동일
+            stepSize: GRID_X_STEP, // 10
           },
           grid: {
             color: "rgba(148,163,184,0.28)",
             drawOnChartArea: true,
           },
+          border: { display: false },
         },
         yVol: {
           position: "right",
+          min: 0,
+          max: 100,
           ticks: {
             display: true,
             color: "#FAF2E5",
             font: AXIS_FONT,
-            count: GRID_Y_TICKS_BOTTOM, // ★ 6줄
+            stepSize: 20,
           },
           grid: {
             color: "rgba(148,163,184,0.28)",
-            drawOnChartArea: true, // ★ 가로 그리드 보이게
+            drawOnChartArea: true,
           },
+          border: { display: false },
           afterFit(scale) {
             scale.width = RIGHT_AXIS_WIDTH;
           },
@@ -1186,23 +1219,35 @@ function initVolumeChart() {
   });
 }
 
+function syncXRangeFromPrice(targetChart) {
+  if (!priceChart || !targetChart) return;
+  const px = priceChart.options.scales.x;
+  const tx = targetChart.options.scales.x;
+  // priceChart 쪽에서 이미 min/max를 0~WINDOW로 잡고 있으니까 그대로 복사
+  tx.min = px.min;
+  tx.max = px.max;
+}
+
 function updateVolumeChart() {
   if (!volumeChart) return;
 
   volumeChart.data.datasets[0].data = volumeData; // 막대
   volumeChart.data.datasets[1].data = volumeData; // Δ 라인
 
-  if (volumeData.length > 0) {
-    const lastX = volumeData[volumeData.length - 1].x;
-    const WINDOW = 60;
-    const xScale = volumeChart.options.scales.x;
-
-    // 🔥 위 그래프랑 동일하게: 0에서 시작, 오른쪽으로만 확장
-    xScale.min = 0;
-    xScale.max = Math.max(WINDOW, lastX + 1);
-  }
-
   volumeChart.update("none");
+}
+
+function updateIndicatorChart() {
+  if (!indicatorChart) return;
+
+  // 🔗 위/아래 차트랑 x축 범위 맞추기
+  syncXRangeFromPrice(indicatorChart);
+
+  // 데이터 반영
+  indicatorChart.data.datasets[0].data = indicatorData;
+
+  // 애니메이션 없이 부드럽게 업데이트
+  indicatorChart.update("none");
 }
 
 function initIndicatorChart() {
@@ -1236,19 +1281,20 @@ function initIndicatorChart() {
         legend: { display: false },
       },
       scales: {
-        // ✅ 세로 그리드 x 위치를 위/아래랑 완전히 동일하게
         x: {
           type: "linear",
+          offset: false,
+          min: 0,
+          max: 60,
           ticks: {
             display: false,
-            stepSize: GRID_X_STEP, // ★ 추가
+            stepSize: GRID_X_STEP,
           },
           grid: {
             color: "rgba(148,163,184,0.28)",
             drawOnChartArea: true,
           },
-          // price / volume 처럼 업데이트에서 min/max를 건드리니까
-          // 여기서 min/max는 안 줘도 됨
+          border: { display: false },
         },
         yIdx: {
           position: "right",
@@ -1257,11 +1303,16 @@ function initIndicatorChart() {
           ticks: {
             color: "#FAF2E5",
             font: AXIS_FONT,
-            count: GRID_Y_TICKS_BOTTOM, // ★ 6줄
+            stepSize: 20, // 🔥 0,20,40,60,80,100
+            autoSkip: false, // 🔥 하나도 안 건너뛰게
+            maxTicksLimit: 6, // 🔥 최대 6개
+            callback: (v) => v,
           },
           grid: {
             color: "rgba(148,163,184,0.25)",
+            drawOnChartArea: true,
           },
+          border: { display: false },
           afterFit(scale) {
             scale.width = RIGHT_AXIS_WIDTH;
           },
@@ -1283,24 +1334,6 @@ function appendIndicatorPoint() {
   if (indicatorData.length > MAX_INDICATOR_POINTS) {
     indicatorData.shift();
   }
-}
-
-function updateIndicatorChart() {
-  if (!indicatorChart) return;
-
-  indicatorChart.data.datasets[0].data = indicatorData;
-
-  if (indicatorData.length > 0) {
-    const lastX = indicatorData[indicatorData.length - 1].x;
-    const WINDOW = 60;
-    const xScale = indicatorChart.options.scales.x;
-
-    // 🔥 나머지 인디케이터도 동일한 타임라인
-    xScale.min = 0;
-    xScale.max = Math.max(WINDOW, lastX + 1);
-  }
-
-  indicatorChart.update("none");
 }
 
 // ====== 메인 루프 ======
@@ -1410,6 +1443,10 @@ async function init() {
   initPriceChart();
   initVolumeChart();
   initIndicatorChart();
+
+  // 🔥 정상성 지수도 캔들처럼 tick=0에서 한 점 먼저 찍기
+  appendIndicatorPoint();
+  updateIndicatorChart();
 
   setInterval(step, TICK_INTERVAL_MS);
 }
