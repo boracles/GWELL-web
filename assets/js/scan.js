@@ -41,6 +41,11 @@ const purityRowEl = document.getElementById("purityRow");
 
 const scanPhaseMetaEl = document.querySelector(".scan-phase-meta");
 
+const gutFocusOverlayEl = document.getElementById("gutFocusOverlay");
+const gutFocusTitleEl = document.getElementById("gutFocusTitle");
+const gutFocusSubEl = document.getElementById("gutFocusSub");
+const gutFocusBodyEl = document.getElementById("gutFocusBody");
+
 const scanSequenceProgressInnerEl = document.getElementById(
   "scanSequenceProgressInner"
 );
@@ -1057,7 +1062,7 @@ function updateProgress() {
 }
 
 // -----------------------------
-// 3D 미생물 씬 (그대로)
+// 3D 미생물 씬
 // -----------------------------
 const scanMicrobesCanvas = document.getElementById("scanMicrobes");
 
@@ -1082,9 +1087,8 @@ const MICRO_MODEL_PATHS = [
 function initMicrobeScene() {
   if (!scanMicrobesCanvas || microScene) return;
 
-  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
-  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
-
+  const width = window.innerWidth;
+  const height = window.innerHeight;
   const THREE = window.THREE;
 
   microRenderer = new THREE.WebGLRenderer({
@@ -1108,13 +1112,15 @@ function initMicrobeScene() {
   microScene.add(amb, dir);
 
   microGroup = new THREE.Group();
-  microGroup.position.z = -6;
+  microGroup.position.set(0, -1.5, -6);
   microScene.add(microGroup);
 
   const loader = new window.GLTFLoader();
   const texLoader = new THREE.TextureLoader();
 
-  // 기본 색 텍스처만 사용 (에미시브/노멀 일단 제거)
+  // -----------------------------
+  // 텍스처 로드 (COLOR / EMISSION)
+  // -----------------------------
   const colorMaps = [
     texLoader.load("assets/img/1_A.png"),
     texLoader.load("assets/img/2_A.png"),
@@ -1122,12 +1128,21 @@ function initMicrobeScene() {
     texLoader.load("assets/img/4_A.png"),
   ];
 
-  // 색공간 / flipY 통일
-  colorMaps.forEach((tex) => {
+  const emissiveMaps = [
+    texLoader.load("assets/img/1_E.png"),
+    texLoader.load("assets/img/2_E.png"),
+    texLoader.load("assets/img/3_E.png"),
+    texLoader.load("assets/img/4_E.png"),
+  ];
+
+  // 3번 확장 쉘용 텍스처 (Ext)
+  const extColorMap = texLoader.load("assets/img/3Ext_A.png");
+  const extEmissiveMap = texLoader.load("assets/img/3Ext_E.png");
+
+  const allTex = [...colorMaps, ...emissiveMaps, extColorMap, extEmissiveMap];
+  allTex.forEach((tex) => {
     if (!tex) return;
-    if ("colorSpace" in tex) {
-      tex.colorSpace = THREE.SRGBColorSpace;
-    }
+    if ("colorSpace" in tex) tex.colorSpace = THREE.SRGBColorSpace;
     tex.flipY = false;
   });
 
@@ -1174,39 +1189,36 @@ function initMicrobeScene() {
           offset: Math.random() * 1000,
           swirlDir: Math.random() > 0.5 ? 1 : -1,
           spawnOffset: Math.random(),
-          // 🔹 이 개체가 어떤 모델 타입인지 기록 (0~3)
           typeIndex: sceneIndex,
         };
 
-        // 🔹 여기서 머티리얼 “단순하게” 적용
+        // 메쉬별 머티리얼 세팅
         wrapper.traverse((obj) => {
           if (!obj.isMesh) return;
 
-          const colorMap = colorMaps[sceneIndex] || null;
+          let map = colorMaps[sceneIndex] || null;
+          let emissiveMap = emissiveMaps[sceneIndex] || null;
 
-          // -----------------------------------
-          // ✨ Microbiome_3.glb (index === 2)
-          //     → 내부 메쉬 2개 중
-          //         meshIndex === 1 에만 3Ext_A 텍스처 적용
-          // -----------------------------------
+          // Microbiome_3 (index === 2)의 두 번째 메쉬만 Ext 텍스처 사용
           if (sceneIndex === 2) {
             if (!obj.userData._meshIndexAssigned)
               obj.userData._meshIndexAssigned = 0;
             const meshIdx = obj.userData._meshIndexAssigned++;
 
             if (meshIdx === 1) {
-              // 두 번째 메쉬
-              colorMap = texLoader.load("assets/img/3Ext_A.png");
-              colorMap.flipY = false;
-              if ("colorSpace" in colorMap)
-                colorMap.colorSpace = THREE.SRGBColorSpace;
+              map = extColorMap;
+              emissiveMap = extEmissiveMap;
             }
           }
 
           obj.material = new THREE.MeshStandardMaterial({
-            map: colorMap,
+            map,
+            emissiveMap,
+            emissive: new THREE.Color(0xffffff),
+            emissiveIntensity: emissiveMap ? 1.2 : 0.0,
+
             metalness: 0.0,
-            roughness: 0.4,
+            roughness: 0.35,
             transparent: true,
             side: THREE.DoubleSide,
           });
@@ -1229,8 +1241,10 @@ function initMicrobeScene() {
 
 function resizeMicrobes() {
   if (!microRenderer || !microCamera) return;
-  const width = scanMicrobesCanvas.clientWidth || window.innerWidth;
-  const height = scanMicrobesCanvas.clientHeight || window.innerHeight;
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
   microRenderer.setSize(width, height);
   microCamera.aspect = width / height;
   microCamera.updateProjectionMatrix();
@@ -1260,11 +1274,9 @@ function animateMicrobes() {
     targetProgress = 0;
   }
 
-  // 🔹 현재 Phase에 따라 “사용할 미생물 종류 개수”
-  // 0: 안 보임 / 1종류 / 2종류 / 3종류 / 4종류
   let activeTypeCount = 0;
   if (currentPhase === "POSTURE" || currentPhase === "A1-2") {
-    activeTypeCount = 1; // 한 종류만
+    activeTypeCount = 1;
   } else if (currentPhase === "B1") {
     activeTypeCount = 2;
   } else if (currentPhase === "B2") {
@@ -1276,22 +1288,7 @@ function animateMicrobes() {
     currentPhase === "C3" ||
     currentPhase === "C4"
   ) {
-    activeTypeCount = 4; // 모든 종류
-  }
-
-  if (currentPhase === "POSTURE") {
-    // 🔥 감지 문장 타이밍에 미생물이 보이게 하기 위한 값
-    targetProgress = 0.2; // 0.15~0.3 아무 값 OK (카메라 z도 살짝 전진)
-  } else if (currentPhase === "A1-2") {
-    targetProgress = 0.25;
-  } else if (currentPhase === "B1") {
-    targetProgress = 0.45;
-  } else if (currentPhase === "B2") {
-    targetProgress = 0.75;
-  } else if (currentPhase === "B3" || currentPhase === "C1") {
-    targetProgress = 1.0;
-  } else {
-    targetProgress = 0;
+    activeTypeCount = 4;
   }
 
   microProgress += (targetProgress - microProgress) * 0.05;
@@ -1309,8 +1306,6 @@ function animateMicrobes() {
   microGroup.children.forEach((wrapper) => {
     const d = wrapper.userData;
 
-    // 아직 허용되지 않은 타입이면 아예 숨김
-    //   typeIndex: 0,1,2,3  / activeTypeCount: 1이면 0만 보이게
     if (typeof d.typeIndex === "number" && d.typeIndex >= activeTypeCount) {
       wrapper.visible = false;
       return;
@@ -1338,6 +1333,7 @@ function animateMicrobes() {
     const x = Math.cos(angle) * r + wobbleSmall;
     const y =
       Math.sin(angle) * r + wobbleSmall2 + Math.sin(t * 0.5 + d.offset) * 0.3;
+
     const z =
       d.baseHeight * (0.3 + 0.5 * appear) +
       Math.sin(t * 0.7 + d.offset * 0.5) * 0.6;
@@ -1390,31 +1386,41 @@ function startScanResultTransition() {
   if (scanResultStarted) return;
   scanResultStarted = true;
 
+  // 1) 진행 바 / 남은 시간 먼저 '완전히 끝난 상태'로 스냅
   scanOverallTimer = SCAN_OVERALL_TOTAL;
+  purity = 98; // 필요하면 100으로 바꿔도 됨
   updateProgress();
 
+  // 2) C1 단계 화면으로 전환 (스캔 완료 안내 문구)
   setPhase("C1");
 
   const scanMainEl = document.querySelector(".scan-main");
 
-  if (scanMainEl) {
-    scanMainEl.classList.add("scan-fade-out");
-  }
+  // 3) C1 상태를 잠깐 유지했다가(예: 1초) 그 다음에 페이드 아웃 시작
+  const HOLD_MS = 1000; // 여기 숫자로 유지 시간 조절 (800~1500ms 정도)
 
   setTimeout(() => {
-    const profile = createRandomGutProfile();
-    analysisResult = generateAnalysisFromGutProfile(profile);
-
-    setPhase("C2");
-
+    // 페이드 아웃 시작
     if (scanMainEl) {
-      scanMainEl.classList.remove("scan-fade-out");
-      scanMainEl.classList.add("scan-fade-in");
-      setTimeout(() => {
-        scanMainEl.classList.remove("scan-fade-in");
-      }, 600);
+      scanMainEl.classList.add("scan-fade-out");
     }
-  }, 800);
+
+    // 4) 페이드 아웃이 끝난 뒤 결과 화면(C2)로 전환
+    setTimeout(() => {
+      const profile = createRandomGutProfile();
+      analysisResult = generateAnalysisFromGutProfile(profile);
+
+      setPhase("C2");
+
+      if (scanMainEl) {
+        scanMainEl.classList.remove("scan-fade-out");
+        scanMainEl.classList.add("scan-fade-in");
+        setTimeout(() => {
+          scanMainEl.classList.remove("scan-fade-in");
+        }, 600);
+      }
+    }, 800); // 페이드 아웃 시간(기존 값 유지)
+  }, HOLD_MS);
 }
 
 function normalize(x, min, max) {
@@ -1589,6 +1595,41 @@ function renderAnalysisResult() {
       ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민에 가깝습니다."
       : "대사 효율이 낮아 에너지 확보가 버겁습니다. '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
 
+  // === 포커스용 점수 묶음 ===
+  const scores = {
+    diversity: diversityScore,
+    conformity: conformityScore,
+    cohesion: cohesionScore,
+    conflict: conflictScore,
+    productivity: productivityScore,
+  };
+
+  const textsForFocus = {
+    diversity: diversityText,
+    conformity: conformityText,
+    cohesion: cohesionText,
+    conflict: conflictText,
+    productivity: productivityText,
+  };
+
+  const metricList = [
+    { key: "conflict", grade: conflictGrade, score: conflictScore },
+    { key: "diversity", grade: diversityGrade, score: diversityScore },
+    { key: "productivity", grade: productivityGrade, score: productivityScore },
+    { key: "cohesion", grade: cohesionGrade, score: cohesionScore },
+    { key: "conformity", grade: conformityGrade, score: conformityScore },
+  ];
+
+  // 1순위: C 등급(문제 큰 지표), 2순위: B 중에서 가장 극단적인 값
+  let focusMetric =
+    metricList.find((m) => m.grade === "C") ||
+    metricList
+      .filter((m) => m.grade === "B")
+      .sort((a, b) => a.score - b.score)[0] ||
+    metricList[0];
+
+  updateGutFocusOverlay(focusMetric.key, profile, scores, textsForFocus);
+
   // === 상단 메타 ===
   const statusText =
     overallGrade === "A" ? "안정" : overallGrade === "B" ? "경계" : "주의";
@@ -1646,7 +1687,7 @@ function renderAnalysisResult() {
   resultListEl.style.display = "block";
   resultListEl.innerHTML = `
 <div class="gut-layout-right-inner"
-     style="display:flex; flex-direction:column; gap:14px; padding-top:24px; height:100%;">
+     style="display:flex; flex-direction:column; gap:24px; padding-top:20px; height:100%;">
   
   <!-- 상단 섹션 타이틀 -->
   <div style="
@@ -1668,21 +1709,21 @@ function renderAnalysisResult() {
     flex:1;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
-    grid-auto-rows:minmax(0, 1fr);
-    row-gap:10px;
+    grid-auto-rows:minmax(0,1fr);
+    row-gap:8px;        /* 🔽 세로 간격 줄이기 */
     column-gap:12px;
     min-height:0;
   ">
 
-    <!-- 0. 레이더 카드 (예전 높이로) -->
+    <!-- 0. 레이더 카드 : 높이/패딩 최소화 -->
     <div style="
       background:#ffffff;
       border-radius:12px;
-      padding:10px 12px 12px 12px;
-      box-shadow:0 4px 12px rgba(15,23,42,0.06);
+      padding:8px 10px 10px 10px; /* 🔽 패딩 축소 */
+      box-shadow:0 4px 10px rgba(15,23,42,0.06);
       display:flex;
       flex-direction:column;
-      gap:6px;
+      gap:4px;
     ">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div style="font-size:13px; font-weight:700; color:#111827;">
@@ -1695,193 +1736,105 @@ function renderAnalysisResult() {
           </div>
         </div>
       </div>
-      <div style="font-size:12px; color:#6b7280; line-height:1.5;">
+      <div style="font-size:12px; color:#6b7280; line-height:1.4;">
         정상성 스펙트럼, 규범 순응도, 공동체 유지 에너지, 사회 염증 지수, 사회 대사 효율을 요약한 그래프입니다.
       </div>
-      <div style="position:relative; flex:1; min-height:170px;">
+      <div style="position:relative; flex:1; min-height:145px;">  <!-- 🔽 170 → 145 -->
         <canvas id="gutRadar" style="width:100%;height:100%;display:block;"></canvas>
       </div>
     </div>
 
-    <!-- 1. 정상성 스펙트럼 -->
-    <div style="
-      background:#FAF2E5;
-      opacity:0.7;
-      border-radius:12px;
-      padding:10px 12px 12px 12px;
-      box-shadow:0 4px 12px rgba(15,23,42,0.05);
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    ">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <img src="assets/img/Gut_1.svg" style="width:28px;height:28px;" />
-          <span style="font-size:13px; font-weight:700; color:#111827;">
-            정상성 스펙트럼
-          </span>
-        </div>
-        <span style="
-          font-size:12px;
-          font-weight:800;
-          padding:2px 8px;
-          border-radius:999px;
-          background:#eef2ff;
-          color:#4f46e5;
-        ">${diversityGrade}</span>
-      </div>
-      <div style="font-size:12px; color:#6b7280;">
-        다양성 = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
-      </div>
-      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
-        ${diversityText}
-      </p>
+    <!-- 공통 카드 스타일 변수처럼 쓸 부분들 -->
+    ${(() => {
+      const cardBase = `
+  background:#FAF2E5;
+  opacity:0.78;
+  border-radius:16px;
+  padding:14px 18px 16px 18px;   /* ⬆ 카드 안쪽 여백 넉넉하게 */
+  box-shadow:0 8px 20px rgba(15,23,42,0.06);
+  display:flex;
+  flex-direction:column;
+  gap:8px;                      /* 제목–본문 사이도 살짝 띄우기 */
+`;
+      const titleRow = (label, grade, icon) => `
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <img src="assets/img/${icon}.svg" style="width:32px;height:32px;" />
+      <span style="font-size:15px; font-weight:800; color:#111827;">
+        ${label}
+      </span>
     </div>
+    <span style="
+      font-size:13px;
+      font-weight:900;
+      padding:4px 10px;
+      border-radius:999px;
+      background:#eef2ff;
+      color:#4f46e5;
+    ">${grade}</span>
+  </div>
+`;
 
-    <!-- 2. 규범 순응도 -->
-    <div style="
-      background:#FAF2E5;
-      opacity:0.7;
-      border-radius:12px;
-      padding:10px 12px 12px 12px;
-      box-shadow:0 4px 12px rgba(15,23,42,0.05);
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    ">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <img src="assets/img/Gut_2.svg" style="width:28px;height:28px;" />
-          <span style="font-size:13px; font-weight:700; color:#111827;">
-            규범 순응도
-          </span>
+      return `
+      <!-- 1. 정상성 스펙트럼 -->
+      <div style="${cardBase}">
+        ${titleRow("정상성 스펙트럼", diversityGrade, "Gut_1")}
+        <div style="font-size:13px; color:#6b7280;">
+          다양성 = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
         </div>
-        <span style="
-          font-size:12px;
-          font-weight:800;
-          padding:2px 8px;
-          border-radius:999px;
-          background:#eef2ff;
-          color:#4f46e5;
-        ">${conformityGrade}</span>
+        <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
+          ${diversityText}
+        </p>
       </div>
-      <div style="font-size:12px; color:#6b7280;">
-        B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
-    conformityScore
-  )}
-      </div>
-      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
-        ${conformityText}
-      </p>
-    </div>
 
-    <!-- 3. 공동체 유지 에너지 -->
-    <div style="
-      background:#FAF2E5;
-      opacity:0.7;
-      border-radius:12px;
-      padding:10px 12px 12px 12px;
-      box-shadow:0 4px 12px rgba(15,23,42,0.05);
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    ">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <img src="assets/img/Gut_3.svg" style="width:28px;height:28px;" />
-          <span style="font-size:13px; font-weight:700; color:#111827;">
-            공동체 유지 에너지
-          </span>
+      <!-- 2. 규범 순응도 -->
+      <div style="${cardBase}">
+        ${titleRow("규범 순응도", conformityGrade, "Gut_2")}
+        <div style="font-size:13px; color:#6b7280;">
+          B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
+        conformityScore
+      )}
         </div>
-        <span style="
-          font-size:12px;
-          font-weight:800;
-          padding:2px 8px;
-          border-radius:999px;
-          background:#eef2ff;
-          color:#4f46e5;
-        ">${cohesionGrade}</span>
+        <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
+          ${conformityText}
+        </p>
       </div>
-      <div style="font-size:12px; color:#6b7280;">
-        SCFA = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
-      </div>
-      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
-        ${cohesionText}
-      </p>
-    </div>
 
-    <!-- 4. 사회 염증 지수 -->
-    <div style="
-      background:#FAF2E5;
-      opacity:0.7;
-      border-radius:12px;
-      padding:10px 12px 12px 12px;
-      box-shadow:0 4px 12px rgba(15,23,42,0.05);
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    ">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <img src="assets/img/Gut_4.svg" style="width:28px;height:28px;" />
-          <span style="font-size:13px; font-weight:700; color:#111827;">
-            사회 염증 지수
-          </span>
+      <!-- 3. 공동체 유지 에너지 -->
+      <div style="${cardBase}">
+        ${titleRow("공동체 유지 에너지", cohesionGrade, "Gut_3")}
+        <div style="font-size:12px; color:#6b7280;">
+          SCFA = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
         </div>
-        <span style="
-          font-size:12px;
-          font-weight:800;
-          padding:2px 8px;
-          border-radius:999px;
-          background:#eef2ff;
-          color:#4f46e5;
-        ">${conflictGrade}</span>
+        <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
+          ${cohesionText}
+        </p>
       </div>
-      <div style="font-size:12px; color:#6b7280;">
-        L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
-    conflictScore
-  )}
-      </div>
-      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
-        ${conflictText}
-      </p>
-    </div>
 
-    <!-- 5. 사회 대사 효율 -->
-    <div style="
-      background:#FAF2E5;
-      opacity:0.7;
-      border-radius:12px;
-      padding:10px 12px 12px 12px;
-      box-shadow:0 4px 12px rgba(15,23,42,0.05);
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    ">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <img src="assets/img/Gut_5.svg" style="width:28px;height:28px;" />
-          <span style="font-size:13px; font-weight:700; color:#111827;">
-            사회 대사 효율
-          </span>
+      <!-- 4. 사회 염증 지수 -->
+      <div style="${cardBase}">
+        ${titleRow("사회 염증 지수", conflictGrade, "Gut_4")}
+        <div style="font-size:13px; color:#6b7280;">
+          L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
+        conflictScore
+      )}
         </div>
-        <span style="
-          font-size:12px;
-          font-weight:800;
-          padding:2px 8px;
-          border-radius:999px;
-          background:#eef2ff;
-          color:#4f46e5;
-        ">${productivityGrade}</span>
+        <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
+          ${conflictText}
+        </p>
       </div>
-      <div style="font-size:12px; color:#6b7280;">
-        EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
-      </div>
-      <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.5;">
-        ${productivityText}
-      </p>
-    </div>
 
+      <!-- 5. 사회 대사 효율 -->
+      <div style="${cardBase}">
+        ${titleRow("사회 대사 효율", productivityGrade, "Gut_5")}
+        <div style="font-size:13px; color:#6b7280;">
+          EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
+        </div>
+        <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
+          ${productivityText}
+        </p>
+      </div>`;
+    })()}
   </div>
 </div>
 `;
@@ -1905,6 +1858,110 @@ function renderAnalysisResult() {
       ],
     });
   }, 0);
+}
+
+// 🔍 결과 페이지: 가장 눈여겨볼 지표를 장 위에 표시
+function updateGutFocusOverlay(focusKey, profile, scores, texts) {
+  if (!gutFocusOverlayEl) return;
+
+  // 지표별로 장 위에서 어느 위치를 찍을지 (대략 값, 필요하면 나중에 수정)
+  const configMap = {
+    diversity: {
+      // ✅ 점: 왼쪽 중간 / 카드: 왼쪽 아래
+      label: "정상성 스펙트럼",
+      dotX: "14%",
+      dotY: "48%",
+      cardX: "8%", // 그대로
+      cardTop: "66%", // 살짝만 아래로
+    },
+    conformity: {
+      // ✅ 점: 오른쪽 아래 / 카드: 오른쪽 아래
+      label: "규범 순응도",
+      dotX: "75%",
+      dotY: "73%",
+      cardX: "56%", // 조금 더 오른쪽
+      cardTop: "78%", // 더 아래쪽으로 떨어뜨리기
+    },
+    cohesion: {
+      // ✅ 점: 맨 오른쪽 중간 / 카드: 오른쪽 중간 위쪽
+      label: "공동체 유지 에너지",
+      dotX: "90%",
+      dotY: "48%",
+      cardX: "56%", // 왼쪽으로 끌어오고
+      cardTop: "60%", // 위에 배치
+    },
+    conflict: {
+      // ✅ 점: 오른쪽 위쪽 / 카드: 오른쪽 중앙
+      label: "사회 염증 지수",
+      dotX: "58%",
+      dotY: "35%",
+      cardX: "54%", // 살짝 왼쪽
+      cardTop: "66%", // cohesion 카드랑 안 겹치게 조금 아래
+    },
+    productivity: {
+      // ✅ 점: 중앙 아래 / 카드: 중앙 아래
+      label: "사회 대사 효율",
+      dotX: "51%",
+      dotY: "76%",
+      cardX: "40%", // 좀 더 가운데로
+      cardTop: "82%", // 맨 아래 라인
+    },
+  };
+
+  const cfg = configMap[focusKey];
+  if (!cfg) {
+    gutFocusOverlayEl.style.display = "none";
+    return;
+  }
+
+  gutFocusOverlayEl.style.display = "block";
+
+  // 위치를 CSS 변수로 넘겨줌
+  const rootStyle = gutFocusOverlayEl.style;
+  rootStyle.setProperty("--gut-focus-dot-x", cfg.dotX);
+  rootStyle.setProperty("--gut-focus-dot-y", cfg.dotY);
+  rootStyle.setProperty("--gut-focus-card-x", cfg.cardX);
+  rootStyle.setProperty("--gut-focus-card-top", cfg.cardTop);
+
+  // 텍스트 구성
+  let sub = "";
+  let body = "";
+  switch (focusKey) {
+    case "diversity":
+      sub = `다양성 지수 D = ${profile.D.toFixed(2)} · ${Math.round(
+        scores.diversity * 100
+      )}%`;
+      body = texts.diversity;
+      break;
+    case "conformity":
+      sub = `B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(
+        2
+      )} · ${Math.round(scores.conformity * 100)}%`;
+      body = texts.conformity;
+      break;
+    case "cohesion":
+      sub = `SCFA = ${profile.Bt.toFixed(1)} · ${Math.round(
+        scores.cohesion * 100
+      )}%`;
+      body = texts.cohesion;
+      break;
+    case "conflict":
+      sub = `L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(
+        1
+      )} · ${Math.round(scores.conflict * 100)}%`;
+      body = texts.conflict;
+      break;
+    case "productivity":
+      sub = `EEE = ${profile.EEE.toFixed(2)} · ${Math.round(
+        scores.productivity * 100
+      )}%`;
+      body = texts.productivity;
+      break;
+  }
+
+  if (gutFocusTitleEl) gutFocusTitleEl.textContent = cfg.label;
+  if (gutFocusSubEl) gutFocusSubEl.textContent = sub;
+  if (gutFocusBodyEl) gutFocusBodyEl.textContent = body;
 }
 
 function drawGutRadar(data) {
