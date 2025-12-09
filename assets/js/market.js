@@ -5,6 +5,10 @@
 const GRID_Y_TICKS_PRICE = 12; // 위 캔들 차트 가로 그리드 개수
 const GRID_Y_TICKS_BOTTOM = 6;
 
+// 💰 상장가 기준 (중심값 + 폭)
+const PRICE_BASE = 100;
+const PRICE_SPAN = 40;
+
 const AXIS_FONT_FAMILY =
   "'futura-pt','Sweet',-apple-system,BlinkMacSystemFont,system-ui,sans-serif";
 
@@ -223,7 +227,7 @@ async function syncMainAssetFromSupabase() {
   // 1) Supabase profiles → assets 로 변환
   for (const row of data) {
     const score = row.social_score ?? 0.5; // 0~1
-    const price = priceBase + (score - 0.5) * priceSpan;
+    const price = PRICE_BASE + (score - 0.5) * PRICE_SPAN;
 
     newAssets.push({
       id: row.profile_label || `P-${row.id}`,
@@ -696,10 +700,12 @@ function updateAssetValues(issue) {
     const delta = noise + asset.trend; // 랜덤 + 추세
 
     let nextPrice = prevPrice + delta;
+    // 💰 priceBase 기준 상대 바닥/천장
+    const minPrice = PRICE_BASE - 3 * PRICE_SPAN;
+    const maxPrice = PRICE_BASE + 3 * PRICE_SPAN;
 
-    // 너무 바닥/천장 안 가게 한 번만 클램프
-    if (nextPrice < 20) nextPrice = 20;
-    if (nextPrice > 180) nextPrice = 180;
+    if (nextPrice < minPrice) nextPrice = minPrice;
+    if (nextPrice > maxPrice) nextPrice = maxPrice;
 
     asset.value = nextPrice;
 
