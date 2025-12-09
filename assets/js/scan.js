@@ -367,7 +367,6 @@ function drawStandbyParticles(time) {
 
 window.addEventListener("resize", () => {
   resizeStandbyCanvas();
-  initStandbyParticles();
 });
 
 function formatTime(sec) {
@@ -469,6 +468,9 @@ function setPhase(phase) {
   if (currentPhase === phase) return;
   currentPhase = phase;
 
+  // 🔹 C5용 전체 화면 메시지 모드 초기화
+  document.body.classList.remove("listing-complete");
+
   // 🔹 결과 화면(C2)일 때만 body에 result-mode 클래스 붙이기
   if (typeof document !== "undefined") {
     document.body.classList.toggle("result-mode", phase === "C2");
@@ -517,11 +519,6 @@ function setPhase(phase) {
     if (standbyScreenEl) standbyScreenEl.style.display = "block";
     if (scanHeaderEl) scanHeaderEl.style.display = "none";
     if (scanRootEl) scanRootEl.style.display = "none";
-
-    if (!standbyAnimReq) {
-      initStandbyParticles();
-      standbyAnimReq = requestAnimationFrame(drawStandbyParticles);
-    }
 
     // 🔹 셰이더 배경 초기화 + 애니메이션 시작
     initStandbyShader();
@@ -942,6 +939,52 @@ function setPhase(phase) {
       secondaryMessageEl.textContent = "다음 기회를 기약하겠습니다.";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.3;
+      break;
+
+    case "C5":
+      if (statusSystemEl) statusSystemEl.textContent = "LISTED";
+
+      // 🔹 중앙 전체 화면 텍스트 모드 켜기
+      document.body.classList.add("listing-complete");
+
+      if (scanMainMessageEl) scanMainMessageEl.style.display = "block";
+
+      if (mainMessageEl) {
+        mainMessageEl.textContent = "상장이 완료되었습니다.";
+      }
+
+      if (subMessageEl) {
+        subMessageEl.textContent =
+          "감사합니다.\n뒤를 돌아 스크린을 확인해 주세요.";
+      }
+
+      if (secondaryMessageEl) {
+        secondaryMessageEl.textContent = "";
+      }
+
+      if (scanResultLayoutEl) scanResultLayoutEl.style.display = "none";
+      if (decisionButtonsEl) decisionButtonsEl.style.display = "none";
+
+      if (scanHeaderEl) scanHeaderEl.style.display = "flex";
+
+      if (scanBgEl) {
+        scanBgEl.className = "scan-bg";
+        scanBgEl.style.opacity = 0.2;
+      }
+
+      setTimeout(() => {
+        pirOn = false;
+        pressureOn = false;
+        scanTimer = 0;
+        purity = 0;
+        microProgress = 0;
+        scanResultStarted = false;
+        scanRunning = false;
+        testTriggered = false; // 🔥 이 줄 추가
+
+        updateSensorStatus();
+        setPhase("A0-1");
+      }, 3500);
       break;
 
     case "D1":
@@ -2703,11 +2746,17 @@ if (postureEl) {
 }
 
 // -----------------------------
-// 스캔 화면 아무 데나 터치 → 바로 결과(C2)로 (테스트용)
+// 스캔 화면 / 결과 화면 터치 처리
 // -----------------------------
 if (scanRootEl) {
   scanRootEl.addEventListener("click", () => {
-    // ✅ "진짜 스캔 단계"에서만 동작 (POSTURE 제외)
+    // 1) 이미 결과 화면(C2)이면 → 상장 완료(C5)로
+    if (currentPhase === "C2") {
+      setPhase("C5");
+      return;
+    }
+
+    // 2) 그 외에는 기존처럼 "스캔 중일 때만" 결과로 점프 (테스트용)
     const isScanFastJumpPhase =
       currentPhase === "A1-2" ||
       currentPhase === "B1" ||
@@ -2718,7 +2767,6 @@ if (scanRootEl) {
     if (!isScanFastJumpPhase) return;
     if (scanResultStarted) return; // 이미 한번 넘어간 상태면 무시
 
-    // 바로 결과 페이지로 점프
     const profile = createRandomGutProfile();
     analysisResult = generateAnalysisFromGutProfile(profile);
 

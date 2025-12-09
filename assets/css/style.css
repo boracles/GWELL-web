@@ -927,13 +927,33 @@ body {
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(env(safe-area-inset-bottom) + 20px);
-  font-size: 11px;
-  color: #faf2e5;
-  opacity: 0.9;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  opacity: 1;
   text-align: center;
   pointer-events: none;
   z-index: 5000;
   display: none;
+
+  letter-spacing: 0.03em;
+  animation: footerBlink 3.6s ease-in-out infinite;
+}
+
+@keyframes footerBlink {
+  0% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
 }
 
 /* ==========================
@@ -2729,4 +2749,38 @@ body.result-mode #scanRoot {
 .scan-result-list .gut-layout-right-inner img[src*="Gut_"] {
   width: 48px !important; /* ← 원하는 크기 */
   height: 48px !important; /* ← 원하는 크기 */
+}
+
+.scan-main-message p {
+  white-space: pre-line;
+}
+
+/* ==========================
+   C5 상장 완료 화면
+========================== */
+body.listing-complete .scan-main-message {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0 32px;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 200; /* 장 이미지·배경 위로 */
+}
+
+body.listing-complete #mainMessage {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+body.listing-complete #subMessage {
+  font-size: 20px;
+  font-weight: 600;
+  opacity: 0.9;
+  white-space: pre-line; /* \n 줄바꿈 적용 */
 }
