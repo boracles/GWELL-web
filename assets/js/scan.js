@@ -56,6 +56,45 @@ const warningTextEl = document.getElementById("warningText");
 let leaveStartTime = null;
 let warnedOnce = false;
 
+const ambientAudio = document.getElementById("ambientAudio");
+
+// -----------------------------
+// 앰비언트 사운드: 최초 터치 한 번 이후 계속 재생
+// -----------------------------
+let ambientStarted = false;
+
+function tryStartAmbient() {
+  if (ambientStarted) return;
+  ambientStarted = true;
+  playAmbient();
+}
+
+// 페이지 어디든 한 번만 탭되면 재생 시작
+document.addEventListener(
+  "click",
+  () => {
+    tryStartAmbient();
+  },
+  { once: true }
+);
+
+function playAmbient() {
+  if (!ambientAudio) return;
+  ambientAudio.volume = 0.4; // 필요하면 조절
+  const p = ambientAudio.play();
+  if (p && p.catch) {
+    p.catch((err) => {
+      console.log("브라우저가 자동 재생 막음:", err);
+    });
+  }
+}
+
+function stopAmbient() {
+  if (!ambientAudio) return;
+  ambientAudio.pause();
+  ambientAudio.currentTime = 0;
+}
+
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------

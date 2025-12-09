@@ -673,38 +673,37 @@ function clamp01(x) {
   return x;
 }
 
-// ✅ 뉴스에 따라 가격 + 정상성 지수 둘 다 움직이는 버전 (이거 하나만 남기기)
+// ✅ 뉴스에 따라 가격 + 정상성 지수 둘 다 움직이는 버전 (단순)
 function updateAssetValues(issue) {
   assets.forEach((asset) => {
+    // 1) 가격 업데이트
     asset.prevValue = asset.value;
 
-    const themeWeight = issue.weightMap[asset.theme] ?? 0;
+    const themeWeight = issue ? issue.weightMap[asset.theme] ?? 0 : 0;
 
-    // === 1) 가격 흔들림 ===
-    const baseNoise = (Math.random() - 0.5) * 4;
-    const issueImpact = themeWeight * 5;
+    // 예전 느낌: 기본 랜덤 ±4 + 이슈 영향
+    const baseNoise = (Math.random() - 0.5) * 4; // -2 ~ +2
+    const issueImpact = themeWeight * 5; // 테마 영향
     const delta = baseNoise + issueImpact;
+
     asset.value = Math.max(1, asset.value + delta);
 
-    // === 2) 정상성 지수 drift ===
+    // 2) 정상성 지수 drift (0~1)
     if (typeof asset.socialIndex !== "number") {
       asset.socialIndex = asset.baseIndex ?? 0.5;
     }
+    if (typeof asset.baseIndex !== "number") {
+      asset.baseIndex = asset.socialIndex;
+    }
 
-    // 뉴스가 바뀔 때 강하게 튀게 만드는 스파이크
-    const issueSpike = themeWeight * 0.15; // 15% 정도
+    const baseIndex = asset.baseIndex;
 
-    // tick마다 천천히 움직임
-    const slowDrift = themeWeight * 0.02; // 기본 드리프트
-    const noise = (Math.random() - 0.5) * 0.03; // 랜덤
+    const idxDrift = themeWeight * 0.02;
+    const idxNoise = (Math.random() - 0.5) * 0.03;
+    const idxPullBack = (baseIndex - asset.socialIndex) * 0.01;
 
-    // Supabase에서 받은 기본 상태로 되돌리는 힘
-    const base = asset.baseIndex ?? asset.socialIndex;
-    const pullBack = (base - asset.socialIndex) * 0.01;
-
-    let next = asset.socialIndex + issueSpike + slowDrift + noise + pullBack;
-
-    asset.socialIndex = clamp01(next);
+    let nextIdx = asset.socialIndex + idxDrift + idxNoise + idxPullBack;
+    asset.socialIndex = clamp01(nextIdx);
   });
 }
 
@@ -1203,12 +1202,16 @@ function initPriceChart() {
           borderColor: "#e5e7eb",
           yAxisID: "yPrice",
           order: 1,
+
+          // 🔥 더 굵게
+          barThickness: 24, // 12 → 24
+          maxBarThickness: 28, // 14 → 28
         },
+
         {
           type: "line",
           label: "Close",
           data: lineData,
-          // 🔥 여기만 노랑 → 보라로 변경
           borderColor: "#a855f7",
           borderWidth: 2,
           pointRadius: 0,
@@ -1233,14 +1236,14 @@ function initPriceChart() {
         x: {
           type: "linear",
           offset: false,
-          min: 0, // 🔥 캔들이랑 동일
+          min: 0,
           max: 60,
           ticks: {
             display: false,
-            stepSize: GRID_X_STEP, // ✅ 세로 그리드 위치 고정 (0,10,20,...)
+            stepSize: GRID_X_STEP,
           },
           grid: {
-            display: false, // 🔥 기본 세로 그리드는 끔
+            display: false,
             drawOnChartArea: false,
           },
           border: { display: false },
@@ -1250,7 +1253,7 @@ function initPriceChart() {
           ticks: {
             color: "#FAF2E5",
             font: AXIS_FONT,
-            count: GRID_Y_TICKS_PRICE, // ★ 12줄
+            count: GRID_Y_TICKS_PRICE,
           },
           grid: { color: "rgba(148,163,184,0.3)" },
           border: { display: false },
@@ -1269,11 +1272,15 @@ function initPriceChart() {
 
 function appendCandle() {
   const asset = getMainAsset();
+
   const open = asset.prevValue;
   const close = asset.value;
+
   const baseHigh = Math.max(open, close);
   const baseLow = Math.min(open, close);
-  const wiggle = Math.random() * 1.5;
+
+  // 🔥 꼬리 길이 (0 ~ 0.8 정도)
+  const wiggle = Math.random() * 0.8;
 
   const high = baseHigh + wiggle;
   const low = baseLow - wiggle;
@@ -1302,6 +1309,7 @@ function updatePriceChart() {
   priceChart.data.datasets[0].data = candleData; // 캔들
   priceChart.data.datasets[1].data = lineData; // 종가 라인
 
+  // x축 min/max 는 options 에서 0~60으로 고정 → 캔들 간격 일정
   priceChart.update();
 }
 
