@@ -58,33 +58,78 @@ let warnedOnce = false;
 
 const ambientAudio = document.getElementById("ambientAudio");
 
+const resultAudio = document.getElementById("resultAudio");
+
+const standbyVoice = document.getElementById("standbyVoice");
+
+const pushVoice = document.getElementById("pushVoice");
+
+function playPushVoice() {
+  if (!pushVoice) return;
+  pushVoice.currentTime = 0;
+  pushVoice.volume = 0.3;
+  const p = pushVoice.play();
+  if (p && p.catch) {
+    p.catch((err) => {
+      console.log("push voice play blocked:", err);
+    });
+  }
+}
+
+function playStandbyVoice() {
+  if (!standbyVoice) return;
+  standbyVoice.currentTime = 0;
+  standbyVoice.volume = 0.4; // ← 여기서 음량 조절
+  standbyVoice.play().catch((err) => console.log(err));
+}
+
+let standbyVoiceTimer = null;
+
+function playResultSound() {
+  if (!resultAudio) return;
+  try {
+    resultAudio.currentTime = 0; // 항상 처음부터
+    resultAudio.volume = 0.5; // 필요하면 0~1 사이로 조절
+    resultAudio.play();
+  } catch (err) {
+    console.log("resultAudio play error:", err);
+  }
+}
+
+function startStandbyVoiceLoop() {
+  if (standbyVoiceTimer) return;
+
+  // 바로 한 번 재생
+  playStandbyVoice();
+
+  // 그 다음부터는 20초마다 한 번씩
+  standbyVoiceTimer = setInterval(() => {
+    if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+      playStandbyVoice();
+    }
+  }, 30000); // 20초마다 (원하면 10000으로 줄여도 됨)
+}
+
+function stopStandbyVoiceLoop() {
+  if (standbyVoiceTimer) {
+    clearInterval(standbyVoiceTimer);
+    standbyVoiceTimer = null;
+  }
+}
+
 // -----------------------------
 // 앰비언트 사운드: 최초 터치 한 번 이후 계속 재생
 // -----------------------------
-let ambientStarted = false;
 
-function tryStartAmbient() {
-  if (ambientStarted) return;
-  ambientStarted = true;
-  playAmbient();
-}
-
-// 페이지 어디든 한 번만 탭되면 재생 시작
-document.addEventListener(
-  "click",
-  () => {
-    tryStartAmbient();
-  },
-  { once: true }
-);
-
+// 🔊 스캔 페이지 앰비언트 사운드 (페이지 로드 시 자동 재생)
 function playAmbient() {
   if (!ambientAudio) return;
-  ambientAudio.volume = 0.4; // 필요하면 조절
+  ambientAudio.loop = true; // 혹시 HTML에 안 넣었으면 여기서도 보장
+  ambientAudio.volume = 0.4; // 필요하면 0.0~1.0에서 조절
   const p = ambientAudio.play();
   if (p && p.catch) {
     p.catch((err) => {
-      console.log("브라우저가 자동 재생 막음:", err);
+      console.log("ambient autoplay blocked:", err);
     });
   }
 }
@@ -629,6 +674,7 @@ function setPhase(phase) {
       showMicrobes(false);
 
       updateScanStepUI(-1, 0); // 스캔 단계/로딩바/문장 리셋
+      startStandbyVoiceLoop();
       break;
 
     case "A0-2":
@@ -650,6 +696,7 @@ function setPhase(phase) {
 
       positionScanSteps();
       showMicrobes(false);
+      startStandbyVoiceLoop();
       break;
 
     case "A1-1":
@@ -665,6 +712,7 @@ function setPhase(phase) {
       break;
 
     case "POSTURE": {
+      stopStandbyVoiceLoop();
       if (statusSystemEl) statusSystemEl.textContent = "";
       if (scanHeaderEl) scanHeaderEl.style.display = "none";
       if (scanTopRowEl) scanTopRowEl.style.display = "none";
@@ -788,6 +836,10 @@ function setPhase(phase) {
 
         seqText.innerText = seq[idx];
         seqText.style.opacity = 1;
+
+        if (idx === 1) {
+          playPushVoice();
+        }
 
         const t1 = setTimeout(() => {
           pumpSVG(idx);
@@ -956,6 +1008,8 @@ function setPhase(phase) {
       break;
 
     case "C2":
+      playResultSound();
+
       if (statusSystemEl) statusSystemEl.textContent = "RESULT";
       mainMessageEl.textContent = "장내 데이터 분석 결과입니다.";
       subMessageEl.textContent = "";
@@ -2886,6 +2940,9 @@ if (btnNo) {
 setPhase("A0-1");
 updateSensorStatus();
 updateProgress();
+
+// 🔊 페이지 로드 시 바로 앰비언트 재생 시도
+playAmbient();
 
 loopInterval = setInterval(mainLoopTick, 1000);
 

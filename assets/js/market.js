@@ -1179,12 +1179,13 @@ function initPriceChart() {
   globalHigh = v;
   globalLow = v;
 
-  // 초기 배열 비우기
   candleData = [];
   lineData = [];
   volumeData = [];
 
   const ctx = canvas.getContext("2d");
+
+  const HALF_RANGE = 12; // 처음에는 ±12 정도 범위
 
   priceChart = new Chart(ctx, {
     type: "candlestick",
@@ -1202,12 +1203,9 @@ function initPriceChart() {
           borderColor: "#e5e7eb",
           yAxisID: "yPrice",
           order: 1,
-
-          // 🔥 더 굵게
-          barThickness: 24, // 12 → 24
-          maxBarThickness: 28, // 14 → 28
+          barThickness: 24,
+          maxBarThickness: 28,
         },
-
         {
           type: "line",
           label: "Close",
@@ -1238,18 +1236,13 @@ function initPriceChart() {
           offset: false,
           min: 0,
           max: 60,
-          ticks: {
-            display: false,
-            stepSize: GRID_X_STEP,
-          },
-          grid: {
-            display: false,
-            drawOnChartArea: false,
-          },
+          ticks: { display: false, stepSize: GRID_X_STEP },
+          grid: { display: false, drawOnChartArea: false },
           border: { display: false },
         },
         yPrice: {
           position: "right",
+
           ticks: {
             color: "#FAF2E5",
             font: AXIS_FONT,
@@ -1265,7 +1258,6 @@ function initPriceChart() {
     },
   });
 
-  // 첫 캔들 하나 넣어서 바로 보이게
   appendCandle();
   updatePriceChart();
 }
@@ -1306,10 +1298,39 @@ function appendCandle() {
 function updatePriceChart() {
   if (!priceChart) return;
 
+  // 데이터 반영
   priceChart.data.datasets[0].data = candleData; // 캔들
   priceChart.data.datasets[1].data = lineData; // 종가 라인
 
-  // x축 min/max 는 options 에서 0~60으로 고정 → 캔들 간격 일정
+  // 🔥 y축을 "보이는 캔들들의 low~high" 기준으로 자동 스케일링
+  if (candleData.length > 0) {
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+
+    for (const c of candleData) {
+      if (typeof c.l === "number" && c.l < minVal) minVal = c.l;
+      if (typeof c.h === "number" && c.h > maxVal) maxVal = c.h;
+    }
+
+    if (Number.isFinite(minVal) && Number.isFinite(maxVal)) {
+      let range = maxVal - minVal;
+
+      // range가 너무 작으면 최소 폭 강제 (상장 직후 같은 경우)
+      if (range < 1) {
+        range = 1;
+        const mid = (minVal + maxVal) / 2;
+        minVal = mid - range / 2;
+        maxVal = mid + range / 2;
+      }
+
+      const padding = range * 0.15; // 위·아래 15% 여백
+
+      const yScale = priceChart.options.scales.yPrice;
+      yScale.min = minVal - padding;
+      yScale.max = maxVal + padding;
+    }
+  }
+
   priceChart.update();
 }
 
