@@ -50,6 +50,12 @@ const scanSequenceProgressInnerEl = document.getElementById(
   "scanSequenceProgressInner"
 );
 
+const warningPageEl = document.getElementById("warningPage");
+const warningTextEl = document.getElementById("warningText");
+
+let leaveStartTime = null;
+let warnedOnce = false;
+
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
@@ -276,6 +282,23 @@ function buildTextTargets(text) {
 // -----------------------------
 let particles = [];
 let standbyAnimReq = null;
+
+function showWarningPage(msg) {
+  // 모든 UI 숨기기
+  scanRootEl.style.display = "none";
+  scanHeaderEl.style.display = "none";
+  standbyScreenEl.style.display = "none";
+
+  // 경고 페이지 표시
+  warningTextEl.textContent = msg;
+  warningPageEl.style.display = "flex";
+}
+
+function hideWarningPage() {
+  warningPageEl.style.display = "none";
+  scanRootEl.style.display = "flex";
+  scanHeaderEl.style.display = "flex";
+}
 
 function initStandbyParticles() {
   if (!standbyCanvas || !standbyCtx) return;
@@ -2471,6 +2494,47 @@ async function listCardToSupabase() {
 // 메인 루프 (1초 단위)
 // -----------------------------
 function mainLoopTick() {
+  // --- 좌석 이탈 예외 처리 ---
+  if (!pressureOn && leaveStartTime) {
+    const elapsed = (Date.now() - leaveStartTime) / 1000;
+
+    // 1차 경고
+    if (elapsed >= 2 && !warnedOnce) {
+      warnedOnce = true;
+      showWarningPage(
+        "착석이 해제되었습니다.\n다시 앉으시면 이어서 진행됩니다."
+      );
+    }
+
+    // 2차 경고
+    // 2차 경고
+    if (elapsed >= 10) {
+      showWarningPage("스캔이 중단되었습니다.\n처음부터 다시 진행해 주세요.");
+      setTimeout(() => {
+        warnedOnce = false;
+        leaveStartTime = null;
+
+        // 🔥 터치 다시 먹게 플래그 리셋
+        testTriggered = false;
+        scanRunning = false;
+        scanTimer = 0;
+        purity = 0;
+
+        setPhase("A0-1");
+        hideWarningPage();
+      }, 2500);
+    }
+
+    return; // 스캔 진행 멈춤
+  }
+
+  // 착석 복귀 시
+  if (pressureOn && leaveStartTime) {
+    leaveStartTime = null;
+    warnedOnce = false;
+    hideWarningPage();
+  }
+
   const USE_PRESSURE_GUARD = false;
 
   const isScanPhase =
@@ -2559,25 +2623,58 @@ function onPirChange(on) {
 function onPressureChange(on) {
   pressureOn = on;
   updateSensorStatus();
-  lastPressureChangeTime = Date.now();
 
   if (on) {
-    lastSitTime = Date.now();
-    if (standbyHintEl) standbyHintEl.style.display = "none";
+    // ✅ 스캔 중에 잠깐 일어났다가 "다시 앉은" 상황이면
+    //    (경고 화면에서 복귀) → 리셋하지 말고 그대로 이어서 진행
+    if (leaveStartTime) {
+      leaveStartTime = null;
+      warnedOnce = false;
 
+      if (warningPageEl && warningPageEl.style.display === "flex") {
+        hideWarningPage();
+      }
+
+      // currentPhase, scanTimer, purity 그대로 유지
+      return;
+    }
+
+    // ✅ 결과 페이지에서 다시 앉으면 아무 일도 안 함
+    if (
+      currentPhase === "C2" ||
+      currentPhase === "C3" ||
+      currentPhase === "C4" ||
+      currentPhase === "C5"
+    ) {
+      return;
+    }
+
+    // ✅ 그 외(처음 착석 등)는 기존처럼 스캔 시작
+    lastSitTime = Date.now();
     setPhase("A1-2");
     scanTimer = 0;
     purity = 0;
     updateProgress();
-  } else {
-    if (currentPhase.startsWith("B") || currentPhase === "A1-2") {
-      setPhase("D1");
-      scanTimer = 0;
-      purity = 0;
-      updateProgress();
-    } else {
-      setPhase("A0-2");
-    }
+    return;
+  }
+
+  // 🔻 여기부터는 착석 해제일 때(on === false)
+
+  // 리절트 페이지(C2)에서 일어나면 → 감사 페이지(C5)로
+  if (currentPhase === "C2") {
+    setPhase("C5");
+    return;
+  }
+
+  const isScanPhase =
+    currentPhase === "A1-2" ||
+    currentPhase === "B1" ||
+    currentPhase === "B2" ||
+    currentPhase === "B3" ||
+    currentPhase === "C1";
+
+  if (isScanPhase && !leaveStartTime) {
+    leaveStartTime = Date.now();
   }
 }
 
@@ -2596,6 +2693,11 @@ if (debugStartBtn) {
     scanRunning = false;
 
     testTriggered = false;
+
+    // 🔥 경고 상태도 초기화
+    leaveStartTime = null;
+    warnedOnce = false;
+    hideWarningPage();
 
     updateSensorStatus();
     setPhase("A0-1");
@@ -2625,6 +2727,11 @@ if (btnReset) {
     scanRunning = false;
 
     testTriggered = false;
+
+    // 🔥 여기도 같이 리셋
+    leaveStartTime = null;
+    warnedOnce = false;
+    hideWarningPage();
 
     updateSensorStatus();
     setPhase("A0-1");
@@ -2778,3 +2885,48 @@ if (scanRootEl) {
     showMicrobes(false);
   });
 }
+
+// ----------------------------------------------------
+// 🔥 여기가 warningPageEl 터치 이벤트를 넣는 정확한 자리
+// ----------------------------------------------------
+if (warningPageEl) {
+  warningPageEl.addEventListener("click", () => {
+    // 경고 페이지가 떠있을 때만 동작
+    if (warningPageEl.style.display !== "flex") return;
+
+    // 다시 앉은 것으로 취급 → 이어서 진행
+    onPressureChange(true);
+  });
+}
+
+// -----------------------------
+// 키보드 테스트 (Q/W로 예외 상황 시뮬레이션)
+// -----------------------------
+window.addEventListener("keydown", (e) => {
+  // Q: "지금 일어났다"를 강제로 시뮬레이션 + 1차 경고 즉시 노출
+  if (e.key === "q" || e.key === "Q") {
+    // 센서 상태를 "스캔 중 → 갑자기 일어남"으로 강제
+    pressureOn = false;
+    leaveStartTime = Date.now(); // 🔥 여기서 타이머 시작
+    warnedOnce = true; // 1차 경고는 직접 띄웠으니까 mainLoop에서 또 안 띄움
+
+    showWarningPage("착석이 해제되었습니다.\n다시 앉으시면 이어서 진행됩니다.");
+  }
+
+  // W: 2차 경고 즉시 + 2.5초 후 완전 리셋
+  else if (e.key === "w" || e.key === "W") {
+    showWarningPage("스캔이 중단되었습니다.\n처음부터 다시 진행해 주세요.");
+
+    setTimeout(() => {
+      warnedOnce = false;
+      leaveStartTime = null;
+      testTriggered = false;
+      scanRunning = false;
+      scanTimer = 0;
+      purity = 0;
+
+      setPhase("A0-1");
+      hideWarningPage();
+    }, 2500);
+  }
+});

@@ -2784,3 +2784,35 @@ body.listing-complete #subMessage {
   opacity: 0.9;
   white-space: pre-line; /* \n 줄바꿈 적용 */
 }
+
+.warning-page {
+  position: fixed;
+  inset: 0;
+  display: none; /* 기본은 숨김 */
+  align-items: center;
+  justify-content: center;
+  background: #000000; /* 완전 검정 */
+  z-index: 3000; /* 다른 것 다 덮어버리게 */
+  padding: 0 40px;
+}
+
+.warning-logo {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+.warning-logo img {
+  height: 56px;
+  width: auto;
+  display: block;
+}
+
+.warning-text {
+  white-space: pre-line; /* \n 그대로 줄바꿈 */
+  text-align: center;
+  font-family: "Sweet", -apple-system, system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: #fdf6ec;
+}
