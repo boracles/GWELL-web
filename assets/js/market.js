@@ -1547,6 +1547,7 @@ function step() {
 }
 
 // ====== 초기화 ======
+// ====== 초기화 ======
 async function init() {
   tickInfoEl = document.getElementById("tickInfo"); // 없어도 무방
   issueTagEl = document.getElementById("issueTag");
@@ -1612,7 +1613,7 @@ async function init() {
     }
   });
 
-  // 그 다음 이슈/티커/파라미터/차트 세팅
+  // 이슈/티커/파라미터 초기 렌더
   currentIssue = pickNewIssue(null);
   renderIssue(currentIssue);
   renderWeights(currentIssue);
@@ -1620,6 +1621,7 @@ async function init() {
   renderScanParams();
   renderComparisonTable();
 
+  // 차트 초기화
   initPriceChart();
   initVolumeChart();
   initIndicatorChart();
@@ -1628,6 +1630,44 @@ async function init() {
   appendIndicatorPoint();
   updateIndicatorChart();
 
+  // 🔥 새로 상장된 프로필을 주기적으로 감지해서 바로 반영
+  const PROFILE_SYNC_INTERVAL_MS = 4000; // 4초마다 한 번 체크
+
+  setInterval(async () => {
+    const beforeId = getMainAsset().id;
+
+    await syncMainAssetFromSupabase();
+
+    const afterId = getMainAsset().id;
+    if (afterId !== beforeId) {
+      // 👉 진짜로 새 프로필이 들어온 경우
+
+      const asset = getMainAsset();
+
+      // 캔들/지표 기준 재설정
+      firstOpen = asset.value;
+      globalHigh = asset.value;
+      globalLow = asset.value;
+
+      candleData = [];
+      lineData = [];
+      volumeData = [];
+      indicatorData = [];
+      tick = 0;
+
+      appendCandle();
+      appendIndicatorPoint();
+
+      renderTicker();
+      renderScanParams();
+      renderComparisonTable();
+      updatePriceChart();
+      updateVolumeChart();
+      updateIndicatorChart();
+    }
+  }, PROFILE_SYNC_INTERVAL_MS);
+
+  // 메인 시뮬레이션 루프 (뉴스/가격/정상성 지수 움직이는 부분)
   setInterval(step, TICK_INTERVAL_MS);
 }
 

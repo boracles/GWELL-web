@@ -589,7 +589,7 @@ function setPhase(phase) {
       updateProgress();
       showMicrobes(false);
 
-      resetScanSteps();
+      updateScanStepUI(-1, 0); // 스캔 단계/로딩바/문장 리셋
       break;
 
     case "A0-2":
