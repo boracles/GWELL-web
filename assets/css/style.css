@@ -2331,15 +2331,25 @@ body.result-mode .scan-global-footer {
 
 /* 위: 캔들, 아래: 거래량 비율 (3 : 1 정도) */
 .chart-main-top {
-  flex: 3 1 0;
+  flex: 3.2 1 0; /* 🔥 위 캔들 차트 높이 비율 */
   min-height: 0;
   background: transparent;
 }
 
 .chart-main-bottom {
-  flex: 1 1 0;
+  flex: 0.9 1 0; /* 🔥 거래량 차트 높이 비율 */
   min-height: 0;
   background: transparent;
+}
+
+.chart-indicator {
+  flex: 0.4 1 0; /* 🔥 거래량과 같은 비율 */
+  min-height: 0;
+
+  background: transparent;
+  margin: 0;
+  padding: 0;
+  position: relative;
 }
 
 .chart-main canvas {
@@ -2357,15 +2367,6 @@ body.result-mode .scan-global-footer {
   flex: 1.6;
   min-height: 320px;
   background: transparent;
-}
-
-.chart-indicator {
-  flex: 0 0 70px;
-  min-height: 60px;
-  background: transparent;
-  margin: 0; /* 🔥 위/아래 여백 다 제거 */
-  padding: 0; /* 🔥 패딩도 0 */
-  position: relative; /* 🔥 라벨을 위에 띄우기 위한 기준 */
 }
 
 /* 세 개 차트 캔버스의 가로폭/정렬 완전 통일 */

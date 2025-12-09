@@ -27,6 +27,10 @@ const COLOR_UP = "#0D7C64"; // 초록 (상승)
 const COLOR_DOWN = "#80233B"; // 빨강 (하락)
 const COLOR_UNCHANGED = "#FAF2E5";
 
+// 🔥 정상성 지수 기준선 (50) 표시용
+const NORMALITY_BASELINE = 50;
+const NORMALITY_BASELINE_COLOR = "#ffaa2b"; // B등급 노란색
+
 // 메인으로 보여줄 자산 (첫 번째 자산 기준)
 const MAIN_ASSET_INDEX = 0;
 
@@ -432,44 +436,151 @@ function formatNumber(num) {
 }
 
 // ====== 오른쪽 끝 현재가 라벨 플러그인 ======
+// 🔥 오른쪽 끝 현재 값 라벨 플러그인 (캔들/거래량/정상성 지수 공통)
 const lastValueLabelPlugin = {
   id: "lastValueLabel",
-  afterDraw(chart, args, pluginOptions) {
-    // candlestick 차트만 처리
-    if (chart.config.type !== "candlestick") return;
-
-    const ds = chart.data.datasets[0];
-    if (!ds || !ds.data || ds.data.length === 0) return;
-
-    const last = ds.data[ds.data.length - 1];
-    if (!last || last.c == null) return;
-
-    // 🔹 y 축 이름이 yPrice 이거나 y 일 수 있으니 안전하게 찾기
-    const yScale =
-      chart.scales["yPrice"] ||
-      chart.scales["y"] ||
-      Object.values(chart.scales)[0];
-
-    if (!yScale) return; // 축 못 찾으면 그냥 스킵
-
-    const y = yScale.getPixelForValue(last.c);
-    const xRight = chart.chartArea.right;
+  // 데이터셋 다 그리고 난 뒤에 실행해서 항상 제일 위에 그리기
+  afterDatasetsDraw(chart) {
+    const area = chart.chartArea;
+    if (!area) return;
 
     const ctx = chart.ctx;
-    const label = formatNumber(last.c);
+
+    function drawLabel(yScale, value, color) {
+      if (!yScale || value == null) return;
+
+      const y = yScale.getPixelForValue(value);
+      if (!Number.isFinite(y)) return;
+
+      const xRight = area.right;
+      const label = formatNumber(Number(value));
+
+      ctx.save();
+      ctx.font = `10px ${AXIS_FONT_FAMILY}`;
+      const textWidth = ctx.measureText(label).width;
+      const paddingX = 6;
+      const boxWidth = textWidth + paddingX * 2;
+      const boxHeight = 18;
+      const boxX = xRight + 4;
+      const boxY = y - boxHeight / 2;
+
+      ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+      }
+
+      ctx.fillStyle = "#111827";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, boxX + paddingX, y);
+
+      ctx.restore();
+    }
+
+    // 1) 캔들 차트 – 종가 라인
+    if (chart.canvas && chart.canvas.id === "priceChart") {
+      const yScale =
+        chart.scales["yPrice"] ||
+        chart.scales["y"] ||
+        Object.values(chart.scales)[0];
+
+      // line 타입 dataset에서 마지막 값 가져오기
+      const lineDs = chart.data.datasets.find((ds) => ds.type === "line");
+      if (!lineDs || !lineDs.data || !lineDs.data.length) return;
+
+      const last = lineDs.data[lineDs.data.length - 1];
+      const val =
+        typeof last === "number" ? last : last.y ?? last.c ?? last.close;
+
+      drawLabel(yScale, val, "#a855f7"); // 보라색 라벨
+      return;
+    }
+
+    // 2) 거래량 차트 – Δ Line
+    if (chart.canvas && chart.canvas.id === "volumeChart") {
+      const yScale =
+        chart.scales["yVol"] ||
+        chart.scales["y"] ||
+        Object.values(chart.scales)[0];
+
+      const lineDs = chart.data.datasets.find((ds) => ds.type === "line");
+      if (!lineDs || !lineDs.data || !lineDs.data.length) return;
+
+      const last = lineDs.data[lineDs.data.length - 1];
+      const val = typeof last === "number" ? last : last.y ?? last;
+
+      drawLabel(yScale, val, "#a855f7"); // 보라색 라벨
+      return;
+    }
+
+    // 3) 정상성 지수 차트 – 메인 지수 라인
+    if (chart.canvas && chart.canvas.id === "indicatorChart") {
+      const yScale =
+        chart.scales["yIdx"] ||
+        chart.scales["y"] ||
+        Object.values(chart.scales)[0];
+
+      const ds = chart.data.datasets[0];
+      if (!ds || !ds.data || !ds.data.length) return;
+
+      const last = ds.data[ds.data.length - 1];
+      const val = typeof last === "number" ? last : last.y ?? last;
+
+      drawLabel(yScale, val, "#8b5cf6"); // 정상성 지수는 라인 색이랑 같은 보라
+      return;
+    }
+  },
+};
+
+// ====== 정상성 지수 기준선 (y=50) 플러그인 ======
+const normalityBaselinePlugin = {
+  id: "normalityBaseline",
+  afterDatasetsDraw(chart) {
+    // indicatorChart에서만 동작
+    if (!chart.canvas || chart.canvas.id !== "indicatorChart") return;
+    if (!chart.scales || !chart.scales.yIdx) return;
+
+    const yScale = chart.scales.yIdx;
+    const area = chart.chartArea;
+    if (!area) return;
+
+    const y = yScale.getPixelForValue(NORMALITY_BASELINE);
+    if (!Number.isFinite(y)) return;
+
+    const ctx = chart.ctx;
+    const xLeft = area.left;
+    const xRight = area.right;
 
     ctx.save();
+
+    // 1) 기준선
+    ctx.strokeStyle = NORMALITY_BASELINE_COLOR;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(xLeft, y);
+    ctx.lineTo(xRight, y);
+    ctx.stroke();
+
+    // 2) 오른쪽 끝 라벨 (보라 현재가 라벨처럼)
+    const label = String(NORMALITY_BASELINE);
     ctx.font = `10px ${AXIS_FONT_FAMILY}`;
     const textWidth = ctx.measureText(label).width;
     const paddingX = 6;
     const boxWidth = textWidth + paddingX * 2;
-    const boxHeight = 18;
+    const boxHeight = 16;
     const boxX = xRight + 4;
     const boxY = y - boxHeight / 2;
 
-    // 보라 박스
-    ctx.fillStyle = "#4c1d95";
-    ctx.strokeStyle = "#a855f7";
+    ctx.fillStyle = NORMALITY_BASELINE_COLOR;
+    ctx.strokeStyle = NORMALITY_BASELINE_COLOR;
     ctx.lineWidth = 1;
 
     if (ctx.roundRect) {
@@ -482,8 +593,7 @@ const lastValueLabelPlugin = {
       ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
     }
 
-    // 텍스트
-    ctx.fillStyle = "#e5e7eb";
+    ctx.fillStyle = "#111827"; // 라벨 안 글자: 진한 남색
     ctx.textBaseline = "middle";
     ctx.fillText(label, boxX + paddingX, y);
 
@@ -491,9 +601,47 @@ const lastValueLabelPlugin = {
   },
 };
 
+// 🔥 캔들/거래량 차트에서 line dataset 을 항상 맨 위에 다시 그려주는 플러그인
+const overlayLineOnTopPlugin = {
+  id: "overlayLineOnTop",
+  afterDatasetsDraw(chart) {
+    if (!chart.canvas) return;
+    const id = chart.canvas.id;
+
+    // 가격(캔들) 차트와 거래량 차트에만 적용
+    if (id !== "priceChart" && id !== "volumeChart") return;
+
+    const lineIndex = chart.data.datasets.findIndex((ds) => ds.type === "line");
+    if (lineIndex < 0) return;
+
+    const meta = chart.getDatasetMeta(lineIndex);
+    if (!meta || !meta.dataset) return;
+
+    const ctx = chart.ctx;
+    ctx.save();
+    // 🔥 line dataset 을 한 번 더 그려서, 캔들/막대 위에 올라오게
+    meta.dataset.draw(ctx);
+    ctx.restore();
+  },
+};
+
+// 🔥 세 차트(캔들 / 볼륨 / 정상성 지수)에 공통 세로 그리드를 그리는 플러그인
+// 🔥 세 차트(캔들 / 볼륨 / 정상성 지수)에 공통 세로 그리드를 그리는 플러그인
+const sharedXGridPlugin = {
+  id: "sharedXGrid",
+  afterDraw(chart) {
+    // ...
+  },
+};
+
 // Chart.js에 플러그인 등록
 if (typeof Chart !== "undefined") {
-  Chart.register(lastValueLabelPlugin);
+  Chart.register(
+    lastValueLabelPlugin,
+    sharedXGridPlugin,
+    normalityBaselinePlugin,
+    overlayLineOnTopPlugin
+  );
 }
 
 function getMainAsset() {
@@ -1035,16 +1183,19 @@ function initPriceChart() {
           },
           borderColor: "#e5e7eb",
           yAxisID: "yPrice",
+          order: 1,
         },
         {
           type: "line",
           label: "Close",
           data: lineData,
-          borderColor: "#facc15",
+          // 🔥 여기만 노랑 → 보라로 변경
+          borderColor: "#a855f7",
           borderWidth: 2,
           pointRadius: 0,
           tension: 0.35,
           yAxisID: "yPrice",
+          order: 99,
         },
       ],
     },
@@ -1070,13 +1221,10 @@ function initPriceChart() {
             stepSize: GRID_X_STEP, // ✅ 세로 그리드 위치 고정 (0,10,20,...)
           },
           grid: {
-            color: "rgba(148,163,184,0.28)",
-            drawOnChartArea: true,
+            display: false, // 🔥 기본 세로 그리드는 끔
+            drawOnChartArea: false,
           },
           border: { display: false },
-          offset: false,
-          min: 0,
-          max: 60,
         },
         yPrice: {
           position: "right",
@@ -1154,8 +1302,16 @@ function initVolumeChart() {
           data: volumeData,
           yAxisID: "yVol",
           borderWidth: 0,
+
+          // 🔥 막대 설정
           barPercentage: 1.0,
           categoryPercentage: 1.0,
+          grouped: false,
+          maxBarThickness: 20,
+
+          // 막대는 먼저(뒤에) 그리기
+          order: 1,
+
           backgroundColor: (ctx) => {
             const v = ctx.raw;
             if (!v) return "rgba(148,163,184,0.4)";
@@ -1167,10 +1323,19 @@ function initVolumeChart() {
           label: "Δ Line",
           data: volumeData,
           yAxisID: "yVol",
-          borderColor: "#facc15",
-          borderWidth: 1.5,
+
+          // 🔥 거래량용 라인은 보라색
+          borderColor: "#a855f7",
+          backgroundColor: "transparent",
+          borderWidth: 2.5,
           pointRadius: 0,
           tension: 0.35,
+          order: 99,
+          // 🔥 막대보다 항상 앞(위)에 오도록 크게
+          order: 99,
+
+          // 혹시 잘리는 구간 없게
+          clip: false,
         },
       ],
     },
@@ -1183,15 +1348,15 @@ function initVolumeChart() {
         x: {
           type: "linear",
           offset: false,
-          min: 0, // 🔥 캔들/정상성과 완전히 동일
+          min: 0,
           max: 60,
           ticks: {
             display: false,
-            stepSize: GRID_X_STEP, // 10
+            stepSize: GRID_X_STEP,
           },
           grid: {
-            color: "rgba(148,163,184,0.28)",
-            drawOnChartArea: true,
+            display: false,
+            drawOnChartArea: false,
           },
           border: { display: false },
         },
@@ -1221,9 +1386,23 @@ function initVolumeChart() {
 
 function syncXRangeFromPrice(targetChart) {
   if (!priceChart || !targetChart) return;
-  const px = priceChart.options.scales.x;
-  const tx = targetChart.options.scales.x;
-  // priceChart 쪽에서 이미 min/max를 0~WINDOW로 잡고 있으니까 그대로 복사
+
+  // 실제 계산된 x 스케일
+  const px = priceChart.scales.x;
+  const tx = targetChart.scales.x;
+  if (!px || !tx) return;
+
+  // 옵션에도 동일한 min/max를 심어주고
+  if (
+    targetChart.options &&
+    targetChart.options.scales &&
+    targetChart.options.scales.x
+  ) {
+    targetChart.options.scales.x.min = px.min;
+    targetChart.options.scales.x.max = px.max;
+  }
+
+  // 실제 스케일 값도 강제로 동일하게 맞추기
   tx.min = px.min;
   tx.max = px.max;
 }
@@ -1231,8 +1410,10 @@ function syncXRangeFromPrice(targetChart) {
 function updateVolumeChart() {
   if (!volumeChart) return;
 
-  volumeChart.data.datasets[0].data = volumeData; // 막대
-  volumeChart.data.datasets[1].data = volumeData; // Δ 라인
+  syncXRangeFromPrice(volumeChart); // ✅ x축 범위 동기화
+
+  volumeChart.data.datasets[0].data = volumeData;
+  volumeChart.data.datasets[1].data = volumeData;
 
   volumeChart.update("none");
 }
@@ -1277,9 +1458,7 @@ function initIndicatorChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: { padding: 0 },
-      plugins: {
-        legend: { display: false },
-      },
+      plugins: { legend: { display: false } },
       scales: {
         x: {
           type: "linear",
@@ -1288,14 +1467,15 @@ function initIndicatorChart() {
           max: 60,
           ticks: {
             display: false,
-            stepSize: GRID_X_STEP,
+            stepSize: GRID_X_STEP, // ✅ 위와 완전히 동일
           },
           grid: {
-            color: "rgba(148,163,184,0.28)",
-            drawOnChartArea: true,
+            display: false, // 🔥 기본 세로 그리드 OFF
+            drawOnChartArea: false,
           },
           border: { display: false },
         },
+
         yIdx: {
           position: "right",
           min: 0,
@@ -1303,9 +1483,9 @@ function initIndicatorChart() {
           ticks: {
             color: "#FAF2E5",
             font: AXIS_FONT,
-            stepSize: 20, // 🔥 0,20,40,60,80,100
-            autoSkip: false, // 🔥 하나도 안 건너뛰게
-            maxTicksLimit: 6, // 🔥 최대 6개
+            stepSize: 20,
+            autoSkip: false,
+            maxTicksLimit: 6,
             callback: (v) => v,
           },
           grid: {
