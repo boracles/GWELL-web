@@ -204,6 +204,10 @@ body {
    공통 app 레이아웃
 ========================== */
 
+.standby-screen * {
+  pointer-events: none !important;
+}
+
 /* 셰이더로 그릴 Standby 배경 캔버스 */
 #standbyShader {
   position: absolute;
@@ -597,6 +601,30 @@ body {
   margin-bottom: 2px;
 }
 
+/* 0) 전체 기본 폰트 (너무 크면 여기 숫자만 줄이면 됨) */
+.scan-result-list .gut-layout-right-inner {
+  font-size: 16px;
+}
+
+/* 1) 제일 위 제목: “장내 생태 기반 사회 적응도 분석 보고서” */
+.scan-result-list .gut-layout-right-inner > div:first-child span:last-child {
+  font-size: 18px !important; /* ← 여기 숫자 바꾸면 됨 */
+  font-weight: 800 !important;
+  margin-bottom: 0px;
+}
+
+/* 2) 카드 안 제목 (아이콘 오른쪽 굵은 글자: ‘정상성 스펙트럼’ 등) */
+.scan-result-list .gut-layout-right-inner img + span {
+  font-size: 18px !important; /* ← 카드 제목 크기 */
+  font-weight: 800 !important;
+}
+
+/* 3) 카드 안 수치 줄 (D = …, B = …, SCFA = … 같은 회색 작은 글자) */
+.scan-result-list .gut-layout-right-inner div[style*="color:#6b7280"] {
+  font-size: 16px !important; /* ← 수치 라인 크기 */
+  font-weight: 600;
+}
+
 /* ==========================
    Scan Result Layout (C2)
 ========================== */
@@ -633,49 +661,90 @@ body {
   top: var(--gut-focus-dot-y);
   width: 22px;
   height: 22px;
-  background: #ffffff;
   border-radius: 999px;
+  background: #ffffff;
   box-shadow: 0 0 18px rgba(0, 0, 0, 0.35);
   transform: translate(-50%, -50%);
-  z-index: 5; /* 도트가 맨 앞으로 */
+  z-index: 5; /* 맨 앞 */
 }
 
 .gut-focus-glow {
   position: absolute;
   left: var(--gut-focus-dot-x);
   top: var(--gut-focus-dot-y);
-  width: 90px;
-  height: 90px;
+  width: 60px;
+  height: 60px;
   transform: translate(-50%, -50%);
   border-radius: 999px;
 
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* 🔥 “색 발광” 없이 진짜 블러만 */
+  /* WebKit에서 blur가 먹으려면 완전 투명은 안 되니까 아주 살짝만 색을 준다 */
+  background: rgba(242, 230, 221, 0.5);
 
-  z-index: 3; /* 도트(5) 뒤, 장 그림(1) 위 */
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  /* 그림자/라이트 링 없음 */
+  box-shadow: none;
+  border: none;
+
+  z-index: 3; /* 장 그림(1) 위, 점(5) 아래 */
   pointer-events: none;
 }
 
-/* 포커스 점 뒤에 큰 보케(Glow) 블러 원 생성 */
-.gut-focus-dot::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 70px; /* 🔥 보케 크기 (원 크기) */
-  height: 70px;
-  transform: translate(-50%, -50%);
+.gut-card {
+  background: #faf2e5;
+  opacity: 0.78;
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gut-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.gut-card-title {
+  font-size: 16px; /* ← 제목 크기 */
+  font-weight: 800;
+  color: #111827;
+}
+
+.gut-card-grade {
+  font-size: 13px;
+  font-weight: 900;
+  padding: 4px 10px;
   border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+}
 
-  /* 🔥 부드러운 보라-아이보리 느낌 반투명 원 */
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+.gut-card-metric {
+  font-size: 13px; /* ← 여기 조정 */
+  color: #6b7280;
+}
 
-  /* 점보다 아래, 배경보다 위 */
-  z-index: -10;
-  pointer-events: none;
+.gut-card-body {
+  font-size: 14px; /* ← 설명문 폰트 */
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.gut-radar-title {
+  font-size: 14px; /* ← 크기 조절 */
+  font-weight: 700;
+  color: #111827;
+}
+
+.gut-radar-desc {
+  font-size: 12px; /* ← 크기 조절 */
+  color: #6b7280;
 }
 
 /* 점에서 카드로 내려가는 선 */
@@ -687,7 +756,11 @@ body {
   height: calc(var(--gut-focus-card-top, 70%) - var(--gut-focus-dot-y, 20%));
   background: rgba(255, 255, 255, 0.7);
   transform: translateX(-50%);
+
+  z-index: 4; /* 🔥 블러(3)보다 위, 점(5)보다 아래 */
+  pointer-events: none;
 }
+
 /* 설명 카드 */
 .gut-focus-card {
   position: absolute;
@@ -712,7 +785,7 @@ body {
 
 /* 카드 안 텍스트들 */
 .gut-focus-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   margin-bottom: 2px;
   color: #3b205c; /* 진한 보라 */
@@ -720,7 +793,7 @@ body {
 
 .gut-focus-sub {
   margin-top: 4px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   opacity: 1;
   color: #6d361a; /* 브라운 톤 */
@@ -728,7 +801,7 @@ body {
 
 .gut-focus-body {
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.6;
   opacity: 1;
   color: #000000;
@@ -747,6 +820,71 @@ body {
   pointer-events: none;
   z-index: 5000;
   display: none;
+}
+
+/* ==========================
+   Gut Radar Card (레이더 박스)
+========================== */
+
+.gut-radar-card {
+  background: #f2e6dd;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  padding: 18px 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gut-radar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gut-radar-title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.gut-radar-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #111827;
+}
+
+.gut-radar-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #38bdf8;
+  display: inline-block;
+}
+
+.gut-radar-legend-label {
+  white-space: nowrap;
+}
+
+.gut-radar-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.gut-radar-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 145px; /* 높이 조절하고 싶으면 여기만 바꾸면 됨 */
+}
+
+.gut-radar-canvas-wrap canvas#g utRadar,
+.gut-radar-canvas-wrap #gutRadar {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 body.result-mode .scan-global-footer {

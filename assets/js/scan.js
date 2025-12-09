@@ -443,11 +443,10 @@ function updateScanStepUI(stepIdx, completedCount) {
     scanPhaseTextEl.style.opacity = 1;
   }
 
-  // ✅ 완료된 칸 개수(0~4)로 클램프
-  const maxCompleted = Math.max(
-    0,
-    Math.min(SCAN_STEP_COUNT, completedCount ?? 0)
-  );
+  // ✅ 도트 개수 기준으로 클램프 (문장은 4개지만 도트는 5개)
+  const DOT_COUNT = scanStepEls ? scanStepEls.length : SCAN_STEP_COUNT + 1;
+
+  const maxCompleted = Math.max(0, Math.min(DOT_COUNT, completedCount ?? 0));
 
   // ✅ 체크: 완전히 끝난 칸까지만 체크
   //   - maxCompleted = 0 → 체크 0개 (시작)
@@ -910,6 +909,12 @@ function setPhase(phase) {
         scanPhaseTextEl.style.opacity = 0;
       }
 
+      // 🔥 여기 추가: 스캔용 보라/주황 그라데이션 전부 끄기
+      if (scanBgEl) {
+        scanBgEl.className = "scan-bg"; // particles / spiral / noise 제거
+        scanBgEl.style.opacity = 0; // 완전 투명 오버레이
+      }
+
       if (scanResultLayoutEl) scanResultLayoutEl.style.display = "grid";
       if (gutVisualEl) gutVisualEl.style.display = "flex";
 
@@ -1192,33 +1197,55 @@ function initMicrobeScene() {
           typeIndex: sceneIndex,
         };
 
-        // 메쉬별 머티리얼 세팅
+        // 🔥 여기서 메쉬 인덱스 제대로 세기 (wrapper 하나당 카운터 0→1→2…)
+        let meshCounter = 0;
+
         wrapper.traverse((obj) => {
           if (!obj.isMesh) return;
 
+          // 기본 COLOR / EMISSION 맵
           let map = colorMaps[sceneIndex] || null;
           let emissiveMap = emissiveMaps[sceneIndex] || null;
 
-          // Microbiome_3 (index === 2)의 두 번째 메쉬만 Ext 텍스처 사용
+          // 💡 Microbiome_3.glb (sceneIndex === 2)의
+          //     "두 번째 메쉬"에만 3Ext_A / 3Ext_E 적용
           if (sceneIndex === 2) {
-            if (!obj.userData._meshIndexAssigned)
-              obj.userData._meshIndexAssigned = 0;
-            const meshIdx = obj.userData._meshIndexAssigned++;
-
-            if (meshIdx === 1) {
+            if (meshCounter === 1) {
               map = extColorMap;
               emissiveMap = extEmissiveMap;
+            }
+            meshCounter++;
+          }
+
+          // 💡 에미션 색 설정
+          // 기본은 꺼둠
+          let emissiveColor = 0x000000;
+
+          if (emissiveMap) {
+            if (sceneIndex === 0) {
+              // 1번
+              emissiveColor = 0x5e47c8; // (94,71,200)
+            } else if (sceneIndex === 1) {
+              // 2번
+              emissiveColor = 0x5e47c8; // (94,71,200)
+            } else if (sceneIndex === 2 && map === extColorMap) {
+              // 3번 Ext 쉘
+              emissiveColor = 0x341dbf; // (52,29,191)
+            } else if (sceneIndex === 3) {
+              // 4번
+              emissiveColor = 0xbf9481; // (191,148,129)
             }
           }
 
           obj.material = new THREE.MeshStandardMaterial({
             map,
             emissiveMap,
-            emissive: new THREE.Color(0xffffff),
-            emissiveIntensity: emissiveMap ? 1.2 : 0.0,
+            emissive: new THREE.Color(emissiveColor),
+            emissiveIntensity: emissiveMap ? 1.4 : 0.0,
 
             metalness: 0.0,
-            roughness: 0.35,
+            roughness: 1.0,
+
             transparent: true,
             side: THREE.DoubleSide,
           });
@@ -1579,7 +1606,7 @@ function renderAnalysisResult() {
       ? "SCFA(특히 Butyrate) 생산이 활발해 공동체 결속 에너지가 높은 상태입니다."
       : cohesionScore >= 0.4
       ? "기초 에너지는 유지되지만 결속력이 흔들릴 수 있는 수준입니다."
-      : "SCFA 생산이 떨어져 서로를 지탱할 힘이 부족한 상태에 가깝습니다.";
+      : "SCFA 생산이 떨어져 서로를 지탱할 힘이 부족한 상태입니다.";
 
   const conflictText =
     conflictScore >= 0.7
@@ -1590,10 +1617,10 @@ function renderAnalysisResult() {
 
   const productivityText =
     productivityScore >= 0.7
-      ? "대사 효율이 높아 에너지를 잉여까지 확보하는 상태입니다. 고효율·고생산성을 강하게 요구받는 위치로 읽힙니다."
+      ? "대사 효율이 높아 에너지를 충분히 확보한 상태입니다. 고효율·고생산성을 강하게 요구받는 위치입니다."
       : productivityScore >= 0.4
-      ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민에 가깝습니다."
-      : "대사 효율이 낮아 에너지 확보가 버겁습니다. '비효율적'이라는 낙인이 쉽게 찍힐 수 있는 조건입니다.";
+      ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민입니다."
+      : "대사 효율이 낮아 에너지 확보가 버겁습니다. 에너지 대사율이 '비효율적'입니다.";
 
   // === 포커스용 점수 묶음 ===
   const scores = {
@@ -1715,32 +1742,16 @@ function renderAnalysisResult() {
     min-height:0;
   ">
 
-    <!-- 0. 레이더 카드 : 높이/패딩 최소화 -->
-    <div style="
-      background:#ffffff;
-      border-radius:12px;
-      padding:8px 10px 10px 10px; /* 🔽 패딩 축소 */
-      box-shadow:0 4px 10px rgba(15,23,42,0.06);
-      display:flex;
-      flex-direction:column;
-      gap:4px;
-    ">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-size:13px; font-weight:700; color:#111827;">
-          장내 사회 지표 레이더
-        </div>
-        <div style="display:flex; gap:6px; font-size:11px; color:#6b7280;">
-          <div style="display:flex; align-items:center; gap:4px;">
-            <span style="width:10px;height:10px;border-radius:999px;background:#38bdf8;display:inline-block;"></span>
-            <span>현재 프로파일</span>
-          </div>
+        <!-- 0. 레이더 카드 : CSS로 스타일 제어 -->
+    <div class="gut-radar-card">
+      <div class="gut-radar-header">
+        <div class="gut-radar-title">장내 사회 지표 레이더</div>
+        <div class="gut-radar-legend">
         </div>
       </div>
-      <div style="font-size:12px; color:#6b7280; line-height:1.4;">
-        정상성 스펙트럼, 규범 순응도, 공동체 유지 에너지, 사회 염증 지수, 사회 대사 효율을 요약한 그래프입니다.
-      </div>
-      <div style="position:relative; flex:1; min-height:145px;">  <!-- 🔽 170 → 145 -->
-        <canvas id="gutRadar" style="width:100%;height:100%;display:block;"></canvas>
+
+      <div class="gut-radar-canvas-wrap">
+        <canvas id="gutRadar"></canvas>
       </div>
     </div>
 
@@ -1839,7 +1850,7 @@ function renderAnalysisResult() {
 </div>
 `;
 
-  // 🔹 레이더 그리기
+  // 🔹 레이더 그리기 (각 지표 등급 전달)
   setTimeout(() => {
     drawGutRadar({
       labels: [
@@ -1855,6 +1866,13 @@ function renderAnalysisResult() {
         cohesionScore,
         conflictScore,
         productivityScore,
+      ],
+      grades: [
+        diversityGrade, // 정상성 스펙트럼
+        conformityGrade, // 규범 순응도
+        cohesionGrade, // 공동체 유지
+        conflictGrade, // 사회 염증
+        productivityGrade, // 대사 효율
       ],
     });
   }, 0);
@@ -1894,7 +1912,7 @@ function updateGutFocusOverlay(focusKey, profile, scores, texts) {
       // ✅ 점: 오른쪽 위쪽 / 카드: 오른쪽 중앙
       label: "사회 염증 지수",
       dotX: "58%",
-      dotY: "35%",
+      dotY: "40%",
       cardX: "54%", // 살짝 왼쪽
       cardTop: "66%", // cohesion 카드랑 안 겹치게 조금 아래
     },
@@ -1981,13 +1999,56 @@ function drawGutRadar(data) {
 
   const labels = data.labels;
   const values = data.values.map((v) => Math.max(0, Math.min(1, v)));
+  const grades = (data.grades || []).map((g) => (g || "B")[0]); // "A-/B+" -> "A/B"
   const count = labels.length;
 
   ctx.clearRect(0, 0, width, height);
   ctx.save();
   ctx.translate(0.5, 0.5); // 비트맵 경계 보정
 
-  // === 그리드 폴리곤 ===
+  // --------------------------
+  // 등급 → RGB 색 정의
+  // --------------------------
+  const gradeHex = (g) => {
+    const gg = (g || "B")[0];
+    if (gg === "A") return "#16a34a"; // 초록
+    if (gg === "C") return "#ef4444"; // 빨강
+    return "#eab308"; // 노랑(B 및 기타)
+  };
+
+  const hexToRgb = (hex) => {
+    const h = hex.replace("#", "");
+    return {
+      r: parseInt(h.substring(0, 2), 16),
+      g: parseInt(h.substring(2, 4), 16),
+      b: parseInt(h.substring(4, 6), 16),
+    };
+  };
+
+  // 점 색(등급들)에서 평균색 뽑기 → 이걸 폴리곤 기본 톤으로 사용
+  let sumR = 0,
+    sumG = 0,
+    sumB = 0;
+  let colorCount = 0;
+
+  for (let i = 0; i < count; i++) {
+    const rgb = hexToRgb(gradeHex(grades[i]));
+    sumR += rgb.r;
+    sumG += rgb.g;
+    sumB += rgb.b;
+    colorCount++;
+  }
+
+  const avgR = colorCount ? sumR / colorCount : 210;
+  const avgG = colorCount ? sumG / colorCount : 180;
+  const avgB = colorCount ? sumB / colorCount : 140;
+
+  const rgba = (r, g, b, a) =>
+    `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
+
+  // --------------------------
+  // 그리드 폴리곤 (축/가이드)
+  // --------------------------
   const levels = 4;
   ctx.strokeStyle = "rgba(148,163,184,0.6)";
   ctx.lineWidth = 1;
@@ -2006,7 +2067,9 @@ function drawGutRadar(data) {
     ctx.stroke();
   }
 
-  // === 축 라인 + 라벨 ===
+  // --------------------------
+  // 축 라인 + 라벨
+  // --------------------------
   ctx.font = "11px Sweet, system-ui";
   ctx.fillStyle = "rgba(148,163,184,0.95)";
 
@@ -2042,7 +2105,28 @@ function drawGutRadar(data) {
     ctx.fillText(labels[i], lx, ly);
   }
 
-  // === 데이터 폴리곤 ===
+  // --------------------------
+  // 폴리곤용 그라데이션 (점색 평균 기반)
+  //  - 안쪽: 살짝 밝고 투명
+  //  - 바깥: 점색에 가까운 톤
+  // --------------------------
+  const polyGrad = ctx.createRadialGradient(
+    cx,
+    cy,
+    radius * 0.1,
+    cx,
+    cy,
+    radius
+  );
+  polyGrad.addColorStop(0, rgba(avgR + 15, avgG + 15, avgB + 15, 0.12));
+  polyGrad.addColorStop(1, rgba(avgR, avgG, avgB, 0.42));
+
+  // 폴리곤 라인 색도 평균색에서 조금 진하게
+  const polyStroke = rgba(avgR - 10, avgG - 10, avgB - 10, 0.9);
+
+  // --------------------------
+  // 데이터 폴리곤
+  // --------------------------
   ctx.beginPath();
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
@@ -2054,26 +2138,30 @@ function drawGutRadar(data) {
   }
   ctx.closePath();
 
-  ctx.fillStyle = "rgba(56,189,248,0.25)"; // 채움
-  ctx.strokeStyle = "rgba(56,189,248,0.9)"; // 외곽
+  ctx.fillStyle = polyGrad;
+  ctx.strokeStyle = polyStroke;
   ctx.lineWidth = 2;
   ctx.fill();
   ctx.stroke();
 
-  // 꼭짓점 점 표시
+  // --------------------------
+  // 각 꼭짓점 점 (등급별 색) - 보더라인 없음
+  // --------------------------
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
     const r = radius * values[i];
     const x = cx + Math.cos(angle) * r;
     const y = cy + Math.sin(angle) * r;
 
+    const dotHex = gradeHex(grades[i]);
+    const dotRgb = hexToRgb(dotHex);
+
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = "#38bdf8";
+    ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+    // 점 내부는 살짝 투명하게
+    ctx.fillStyle = rgba(dotRgb.r, dotRgb.g, dotRgb.b, 0.95);
     ctx.fill();
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // 🔥 보더라인 없음: stroke() 호출 안 함
   }
 
   ctx.restore();
@@ -2331,21 +2419,41 @@ loopInterval = setInterval(mainLoopTick, 1000);
 // -----------------------------
 // 터치 테스트: standby → POSTURE
 // -----------------------------
+
+function handleStandbyTap() {
+  // 이미 한 번 넘어갔으면 무시
+  if (testTriggered) return;
+
+  // 진짜 대기 상태일 때만 동작
+  if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+    testTriggered = true;
+
+    setPhase("POSTURE");
+    scanTimer = 0;
+    purity = 0;
+    updateProgress();
+  }
+}
+
+// 1) standbyScreen 자체에 한 번
 if (standbyScreenEl) {
-  standbyScreenEl.addEventListener("click", () => {
-    // 이미 한번 넘긴 뒤면 또 안넘어가게 (테스트 버튼으로 초기화 가능)
-    if (testTriggered) return;
-
-    if (currentPhase === "A0-1" || currentPhase === "A0-2") {
-      testTriggered = true;
-
-      setPhase("POSTURE");
-      scanTimer = 0;
-      purity = 0;
-      updateProgress();
-    }
+  standbyScreenEl.addEventListener("click", (e) => {
+    // 혹시라도 위에서 막는 거 있으면 대비해서 stopPropagation 안 씀
+    handleStandbyTap();
   });
 }
+
+// 2) 혹시 standby 위에 다른 레이어가 있어도
+//    "대기 상태(A0-1 / A0-2)" 에서는 화면 아무 데나 탭하면 강제로 넘기기
+document.body.addEventListener(
+  "click",
+  (e) => {
+    if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+      handleStandbyTap();
+    }
+  },
+  true // 🔥 capture 단계에서 먼저 가로챔
+);
 
 // -----------------------------
 // POSTURE 화면 터치 → 바로 스캔 시작(A1-2)
