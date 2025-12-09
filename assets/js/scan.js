@@ -938,7 +938,9 @@ function setPhase(phase) {
       if (scanResultLayoutEl) scanResultLayoutEl.style.display = "grid";
       if (gutVisualEl) gutVisualEl.style.display = "flex";
 
-      decisionButtonsEl.style.display = "flex";
+      if (decisionButtonsEl) {
+        decisionButtonsEl.style.display = "flex";
+      }
       renderAnalysisResult();
       showMicrobes(false);
       break;
@@ -2469,6 +2471,29 @@ function createRandomGutProfile() {
   };
 }
 
+// 🔥 스캔 결과를 Supabase profiles 테이블에 저장
+async function saveScanProfileToSupabase(profile) {
+  if (!db || !profile) return;
+
+  // profile 안에 있는 값 이름은 네 구조에 맞게 가져오면 됨
+  // 아래는 예시: D/B/P + socialIndex + 효율값
+  const row = {
+    profile_label: profile.label || profile.id || "GA-01", // 티커에 쓸 이름
+    social_score: profile.socialIndex ?? profile.sni ?? 0.5, // 0~1
+    diversity: profile.D ?? 0.6,
+    benefit: profile.B ?? 0.5,
+    pathology: profile.P ?? 0.5,
+    efficiency: profile.EEE ?? profile.E ?? 1.0, // 네가 쓰는 효율값
+  };
+
+  const { error } = await db.from("profiles").insert(row);
+  if (error) {
+    console.error("❌ saveScanProfileToSupabase error:", error);
+  } else {
+    console.log("✅ profile saved to Supabase:", row);
+  }
+}
+
 // ✅ 수정된 버전 (profiles 테이블 구조에 맞춤)
 async function listCardToSupabase() {
   // 이미 C2 화면에서 analysisResult를 만든 상태니까
@@ -2646,6 +2671,20 @@ function onPirChange(on) {
   }
 }
 
+// ✅ C2(리절트 화면)에서 상장 확정할 때 공통으로 쓰는 함수
+async function commitListingFromScan() {
+  // 상장 절차 진행 화면
+  setPhase("C3");
+
+  // Supabase profiles 테이블에 현재 analysisResult 저장
+  await listCardToSupabase();
+
+  // C3 문구를 잠깐 보여준 뒤 → 상장 완료 안내(C5)
+  setTimeout(() => {
+    setPhase("C5"); // C5 안에서 3.5초 후 A0-1으로 리셋됨
+  }, 800);
+}
+
 function onPressureChange(on) {
   pressureOn = on;
   updateSensorStatus();
@@ -2684,14 +2723,15 @@ function onPressureChange(on) {
     return;
   }
 
-  // 🔻 여기부터는 착석 해제일 때(on === false)
+  // 🔻 여기부터는 착석 해제(on === false)
 
-  // 리절트 페이지(C2)에서 일어나면 → 감사 페이지(C5)로
+  // 🔻 C2(리절트 화면)에서 일어나면 = 상장 OK
   if (currentPhase === "C2") {
-    setPhase("C5");
+    commitListingFromScan(); // Supabase insert + C3 → C5
     return;
   }
 
+  // 🔻 그 밖의 Phase에서 일어나면 = 상장 X, 그냥 이탈 타이머만
   const isScanPhase =
     currentPhase === "A1-2" ||
     currentPhase === "B1" ||
@@ -2883,9 +2923,9 @@ if (postureEl) {
 // -----------------------------
 if (scanRootEl) {
   scanRootEl.addEventListener("click", () => {
-    // 1) 이미 결과 화면(C2)이면 → 상장 완료(C5)로
+    // 1) 이미 결과 화면(C2)이면 → 상장 완료 플로우 강제 실행 (테스트용)
     if (currentPhase === "C2") {
-      setPhase("C5");
+      commitListingFromScan(); // ✅ Supabase insert + C3 → C5
       return;
     }
 
