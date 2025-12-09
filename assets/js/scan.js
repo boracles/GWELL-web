@@ -1991,51 +1991,45 @@ function renderAnalysisResult() {
   }, 0);
 }
 
-// 🔍 결과 페이지: 가장 눈여겨볼 지표를 장 위에 표시
-function updateGutFocusOverlay(focusKey, profile, scores, texts, rawGrade) {
+// 🔍 결과 페이지: 장 위 포커스 카드 (간결 버전)
+function updateGutFocusOverlay(focusKey, profile, scores, _texts, rawGrade) {
   if (!gutFocusOverlayEl) return;
 
-  // 지표별로 장 위에서 어느 위치를 찍을지 (대략 값, 필요하면 나중에 수정)
   const configMap = {
     diversity: {
-      // ✅ 점: 왼쪽 중간 / 카드: 왼쪽 아래
       label: "정상성 스펙트럼",
       dotX: "15%",
       dotY: "48%",
-      cardX: "8%", // 그대로
-      cardTop: "66%", // 살짝만 아래로
+      cardX: "8%",
+      cardTop: "66%",
     },
     conformity: {
-      // ✅ 점: 오른쪽 아래 / 카드: 오른쪽 아래
       label: "규범 순응도",
       dotX: "75%",
       dotY: "73%",
-      cardX: "56%", // 조금 더 오른쪽
-      cardTop: "78%", // 더 아래쪽으로 떨어뜨리기
+      cardX: "56%",
+      cardTop: "78%",
     },
     cohesion: {
-      // ✅ 점: 맨 오른쪽 중간 / 카드: 오른쪽 중간 위쪽
       label: "공동체 유지 에너지",
       dotX: "90%",
       dotY: "48%",
-      cardX: "56%", // 왼쪽으로 끌어오고
-      cardTop: "60%", // 위에 배치
+      cardX: "56%",
+      cardTop: "60%",
     },
     conflict: {
-      // ✅ 점: 오른쪽 위쪽 / 카드: 오른쪽 중앙
       label: "사회 염증 지수",
       dotX: "58%",
       dotY: "34%",
-      cardX: "54%", // 살짝 왼쪽
-      cardTop: "66%", // cohesion 카드랑 안 겹치게 조금 아래
+      cardX: "54%",
+      cardTop: "66%",
     },
     productivity: {
-      // ✅ 점: 중앙 아래 / 카드: 중앙 아래
       label: "사회 대사 효율",
       dotX: "51%",
       dotY: "76%",
-      cardX: "40%", // 좀 더 가운데로
-      cardTop: "82%", // 맨 아래 라인
+      cardX: "40%",
+      cardTop: "82%",
     },
   };
 
@@ -2047,46 +2041,40 @@ function updateGutFocusOverlay(focusKey, profile, scores, texts, rawGrade) {
 
   gutFocusOverlayEl.style.display = "block";
 
-  // 위치를 CSS 변수로 넘겨줌
+  // 위치
   const rootStyle = gutFocusOverlayEl.style;
   rootStyle.setProperty("--gut-focus-dot-x", cfg.dotX);
   rootStyle.setProperty("--gut-focus-dot-y", cfg.dotY);
   rootStyle.setProperty("--gut-focus-card-x", cfg.cardX);
   rootStyle.setProperty("--gut-focus-card-top", cfg.cardTop);
 
-  // 텍스트 구성
+  // 수치 한 줄
   let sub = "";
-  let body = "";
   switch (focusKey) {
     case "diversity":
-      sub = `다양성 지수 D = ${profile.D.toFixed(2)} · ${Math.round(
+      sub = `D = ${profile.D.toFixed(2)} · ${Math.round(
         scores.diversity * 100
       )}%`;
-      body = texts.diversity;
       break;
     case "conformity":
       sub = `B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(
         2
       )} · ${Math.round(scores.conformity * 100)}%`;
-      body = texts.conformity;
       break;
     case "cohesion":
       sub = `SCFA = ${profile.Bt.toFixed(1)} · ${Math.round(
         scores.cohesion * 100
       )}%`;
-      body = texts.cohesion;
       break;
     case "conflict":
       sub = `L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(
         1
       )} · ${Math.round(scores.conflict * 100)}%`;
-      body = texts.conflict;
       break;
     case "productivity":
       sub = `EEE = ${profile.EEE.toFixed(2)} · ${Math.round(
         scores.productivity * 100
       )}%`;
-      body = texts.productivity;
       break;
   }
 
@@ -2095,28 +2083,36 @@ function updateGutFocusOverlay(focusKey, profile, scores, texts, rawGrade) {
   if (gutFocusSubEl) {
     gutFocusSubEl.textContent = sub;
 
-    // 🔥 등급 → A/B/C 한 글자만 뽑기
-    const g = (rawGrade || "").charAt(0); // "A-", "B+" → "A", "B"
-
-    // 기존 등급 클래스 제거
+    const g = (rawGrade || "").charAt(0) || "B";
     gutFocusSubEl.classList.remove(
       "gut-focus-sub-A",
       "gut-focus-sub-B",
       "gut-focus-sub-C"
     );
-
-    // 새 등급 클래스 추가
-    if (g === "A") {
-      gutFocusSubEl.classList.add("gut-focus-sub-A");
-    } else if (g === "C") {
-      gutFocusSubEl.classList.add("gut-focus-sub-C");
-    } else {
-      // B 또는 그 외는 B로 처리
-      gutFocusSubEl.classList.add("gut-focus-sub-B");
-    }
+    if (g === "A") gutFocusSubEl.classList.add("gut-focus-sub-A");
+    else if (g === "C") gutFocusSubEl.classList.add("gut-focus-sub-C");
+    else gutFocusSubEl.classList.add("gut-focus-sub-B");
   }
 
-  if (gutFocusBodyEl) gutFocusBodyEl.textContent = body;
+  // 👉 본문은 등급 요약 한 문장만
+  if (gutFocusBodyEl) {
+    const g = (rawGrade || "").charAt(0) || "B";
+    let oneLine = "";
+
+    switch (g) {
+      case "A":
+        oneLine = "공단 기준 A 등급으로, 가장 안정적인 상태입니다.";
+        break;
+      case "C":
+        oneLine = "공단 기준 C 등급으로, 집중 관리가 필요한 상태입니다.";
+        break;
+      default:
+        oneLine = "공단 기준 B 등급으로, 평균 범위에 해당합니다.";
+        break;
+    }
+
+    gutFocusBodyEl.textContent = oneLine;
+  }
 }
 
 function drawGutRadar(data) {
