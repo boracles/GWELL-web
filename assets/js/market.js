@@ -68,7 +68,7 @@ let firstOpen = null;
 // ====== 자산 & 이슈 데이터 ======
 const THEMES = ["돌봄", "생산성", "순응/정상성", "저항"];
 
-const assets = [
+const seedAssets = [
   {
     id: "GA-01",
     name: "장시간 노동에 시달리는 장",
@@ -191,7 +191,9 @@ const assets = [
   },
 ];
 
-// ✅ Supabase에서 최신 프로필 1개 불러와서 assets[0]에 적용
+let assets = [...seedAssets];
+
+// ✅ Supabase에서 최근 스캔 프로필 여러 개를 불러와서 assets 전체를 구성
 async function syncMainAssetFromSupabase() {
   if (!db) return;
 
@@ -199,38 +201,55 @@ async function syncMainAssetFromSupabase() {
     .from("profiles")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(20); // 최근 20개까지 사용 (원하면 숫자 바꿔도 됨)
 
   if (error) {
-    console.error("load latest profile error:", error);
+    console.error("load latest profiles error:", error);
+    // 에러나면 그냥 기존 seedAssets만 쓰게 둠
     return;
   }
-  if (!data || data.length === 0) return;
 
-  const row = data[0];
-  const main = assets[MAIN_ASSET_INDEX];
+  // Supabase에 아직 데이터 없으면 → 기본 자산만 사용
+  if (!data || data.length === 0) {
+    assets = [...seedAssets];
+    return;
+  }
 
-  // social_score(0~1)를 가격 대역으로 매핑
-  const score = row.social_score ?? 0.5;
   const priceBase = 100;
   const priceSpan = 40;
-  const price = priceBase + (score - 0.5) * priceSpan;
 
-  const scanLabel = row.profile_label || main.id;
+  const newAssets = [];
 
-  main.id = scanLabel; // 티커에 찍힐 ID
-  main.name = "장내 자산 상장 프로파일"; // 필요하면 다른 문구로 바꿔도 됨
-  main.value = price;
-  main.prevValue = price;
+  // 1) Supabase profiles → assets 로 변환
+  for (const row of data) {
+    const score = row.social_score ?? 0.5; // 0~1
+    const price = priceBase + (score - 0.5) * priceSpan;
 
-  // D/B/P 도 덮어쓰기
-  main.D = row.diversity ?? main.D;
-  main.B = row.benefit ?? main.B;
-  main.P = row.pathology ?? main.P;
+    newAssets.push({
+      id: row.profile_label || `P-${row.id}`,
+      name: "장내 자산 상장 프로파일",
+      theme: "순응/정상성", // 이슈 반응용 테마 (필요하면 바꿔도 됨)
+      value: price,
+      prevValue: price,
 
-  // 🔹 스캔 결과의 효율, 사회 적응도도 같이 보관
-  main.E = row.efficiency ?? main.E; // scan.js의 profile.EEE
-  main.socialIndex = row.social_score ?? main.socialIndex; // scan.js의 sni
+      D: row.diversity ?? 0.6,
+      B: row.benefit ?? 0.5,
+      P: row.pathology ?? 0.5,
+
+      E: row.efficiency ?? 1.0,
+      socialIndex: score,
+      baseIndex: score,
+    });
+  }
+
+  // 2) 기존 GA-XX 자산도 배경으로 붙이고 싶으면 아래 유지
+  //    완전히 Supabase 데이터만 쓰고 싶으면 이 줄은 지워도 됨.
+  seedAssets.forEach((seed) => {
+    newAssets.push({ ...seed });
+  });
+
+  // 3) 최종 반영
+  assets = newAssets;
 }
 
 // ====== 이슈(뉴스) 데이터 ======
@@ -1640,7 +1659,10 @@ async function init() {
 
     const afterId = getMainAsset().id;
     if (afterId !== beforeId) {
-      // 👉 진짜로 새 프로필이 들어온 경우
+      assets.forEach((asset) => {
+        const m = computeScanParams(asset);
+        asset.initialGrade = m.contribution;
+      });
 
       const asset = getMainAsset();
 
