@@ -1809,6 +1809,8 @@ function renderAnalysisResult() {
   const idText =
     "G-" + String(2000 + Math.floor(Math.random() * 9000)) + "-" + overallGrade;
 
+  window.lastGutProfileLabel = idText; // ✅ Supabase insert 때 같이 쓰려고 저장
+
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -2467,19 +2469,43 @@ function createRandomGutProfile() {
   };
 }
 
-// Supabase 상장
+// ✅ 수정된 버전 (profiles 테이블 구조에 맞춤)
 async function listCardToSupabase() {
-  const profile = createRandomGutProfile();
-  analysisResult = generateAnalysisFromGutProfile(profile);
+  // 이미 C2 화면에서 analysisResult를 만든 상태니까
+  // 혹시라도 null이면 한 번 만들어 주는 정도만.
+  if (!analysisResult) {
+    const profile = createRandomGutProfile();
+    analysisResult = generateAnalysisFromGutProfile(profile);
+  }
 
-  const label = "G-" + String(2000 + Math.floor(Math.random() * 9000)) + "-A";
-  const value = parseFloat(analysisResult.socialEfficiency);
+  const profile = analysisResult.profile; // { D, B, P, Bt, L, C, EEE, beta }
+  const sm = analysisResult.socialMetrics || {}; // { NRS, CS, ... sni }
+  const sniRaw = analysisResult.sni ?? 0.5;
+
+  // 0~1 → 점수
+  const socialScore = Math.max(0, Math.min(1, sniRaw));
+
+  // A/B/C 등급
+  let grade;
+  if (socialScore >= 0.7) grade = "A";
+  else if (socialScore >= 0.4) grade = "B";
+  else grade = "C";
+
+  // 프로필 라벨은 C2에서 썼던 ID 형식 재사용 (없으면 기본값)
+  const profileLabel =
+    (window.lastGutProfileLabel && String(window.lastGutProfileLabel)) ||
+    "장내 자산 프로파일";
 
   const { error } = await db.from("profiles").insert({
-    label,
-    ...profile,
-    value,
-    listed: true,
+    diversity: profile.D, // 다양성
+    benefit: profile.B, // 유익도
+    pathology: profile.P, // 위험도/병리
+    scfa: profile.Bt, // SCFA
+    inflammation: profile.L, // 염증 (필요하면 L+C로 다시 설계해도 됨)
+    efficiency: profile.EEE, // 에너지 효율
+    social_score: socialScore, // 0~1 사회 적응도 지수
+    grade,
+    profile_label: profileLabel,
   });
 
   if (error) {

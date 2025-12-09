@@ -1,18 +1,37 @@
 // assets/js/market.js
 
 // ====== 기본 설정 ======
+
+const GRID_Y_TICKS_PRICE = 12; // 위 캔들 차트 가로 그리드 개수
+const GRID_Y_TICKS_BOTTOM = 6;
+
+const AXIS_FONT_FAMILY =
+  "'futura-pt','Sweet',-apple-system,BlinkMacSystemFont,system-ui,sans-serif";
+
+const AXIS_FONT = {
+  size: 10, // ← 숫자 크기(축 숫자용). 9~11 사이에서 네 눈에 맞게 조절 가능
+  family: AXIS_FONT_FAMILY,
+};
+
 const TICK_INTERVAL_MS = 5000;
 const ISSUE_CHANGE_EVERY = 12;
+
+const db = window.supabaseClient;
+
+const RIGHT_AXIS_WIDTH = 52;
 
 let tick = 0;
 let currentIssue = null;
 
-const COLOR_UP = "#0FEDBE";
-const COLOR_DOWN = "#F63C6B";
-const COLOR_UNCHANGED = "#FAF2E5"; // 필요하면 유지
+const COLOR_UP = "#0D7C64"; // 초록 (상승)
+const COLOR_DOWN = "#80233B"; // 빨강 (하락)
+const COLOR_UNCHANGED = "#FAF2E5";
 
 // 메인으로 보여줄 자산 (첫 번째 자산 기준)
 const MAIN_ASSET_INDEX = 0;
+
+const GRID_X_STEP = 10; // 세로 그리드 간격 (x축 값 10단위마다)
+const GRID_Y_TICKS = 6; // y축 가로 그리드 줄 개수
 
 // DOM (이슈/상태/티커 + 통계용)
 let tickInfoEl, issueTagEl, issueTextEl, weightListEl;
@@ -167,6 +186,48 @@ const assets = [
     P: 0.75,
   },
 ];
+
+// ✅ Supabase에서 최신 프로필 1개 불러와서 assets[0]에 적용
+async function syncMainAssetFromSupabase() {
+  if (!db) return;
+
+  const { data, error } = await db
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error("load latest profile error:", error);
+    return;
+  }
+  if (!data || data.length === 0) return;
+
+  const row = data[0];
+  const main = assets[MAIN_ASSET_INDEX];
+
+  // social_score(0~1)를 가격 대역으로 매핑
+  const score = row.social_score ?? 0.5;
+  const priceBase = 100;
+  const priceSpan = 40;
+  const price = priceBase + (score - 0.5) * priceSpan;
+
+  const scanLabel = row.profile_label || main.id;
+
+  main.id = scanLabel; // 티커에 찍힐 ID
+  main.name = "장내 자산 상장 프로파일"; // 필요하면 다른 문구로 바꿔도 됨
+  main.value = price;
+  main.prevValue = price;
+
+  // D/B/P 도 덮어쓰기
+  main.D = row.diversity ?? main.D;
+  main.B = row.benefit ?? main.B;
+  main.P = row.pathology ?? main.P;
+
+  // 🔹 스캔 결과의 효율, 사회 적응도도 같이 보관
+  main.E = row.efficiency ?? main.E; // scan.js의 profile.EEE
+  main.socialIndex = row.social_score ?? main.socialIndex; // scan.js의 sni
+}
 
 // ====== 이슈(뉴스) 데이터 ======
 const issues = [
@@ -398,7 +459,7 @@ const lastValueLabelPlugin = {
     const label = formatNumber(last.c);
 
     ctx.save();
-    ctx.font = "11px -apple-system, system-ui, sans-serif";
+    ctx.font = `10px ${AXIS_FONT_FAMILY}`;
     const textWidth = ctx.measureText(label).width;
     const paddingX = 6;
     const boxWidth = textWidth + paddingX * 2;
@@ -439,25 +500,75 @@ function getMainAsset() {
   return assets[MAIN_ASSET_INDEX];
 }
 
-// ====== 자산 값 업데이트 ======
+function clamp01(x) {
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+
+// ✅ 뉴스에 따라 가격 + 정상성 지수 둘 다 움직이는 버전 (이거 하나만 남기기)
 function updateAssetValues(issue) {
   assets.forEach((asset) => {
     asset.prevValue = asset.value;
 
     const themeWeight = issue.weightMap[asset.theme] ?? 0;
-    const baseNoise = (Math.random() - 0.5) * 4; // -2 ~ +2
-    const issueImpact = themeWeight * 5;
 
+    // === 1) 가격 흔들림 ===
+    const baseNoise = (Math.random() - 0.5) * 4;
+    const issueImpact = themeWeight * 5;
     const delta = baseNoise + issueImpact;
     asset.value = Math.max(1, asset.value + delta);
+
+    // === 2) 정상성 지수 drift ===
+    if (typeof asset.socialIndex !== "number") {
+      asset.socialIndex = asset.baseIndex ?? 0.5;
+    }
+
+    // 뉴스가 바뀔 때 강하게 튀게 만드는 스파이크
+    const issueSpike = themeWeight * 0.15; // 15% 정도
+
+    // tick마다 천천히 움직임
+    const slowDrift = themeWeight * 0.02; // 기본 드리프트
+    const noise = (Math.random() - 0.5) * 0.03; // 랜덤
+
+    // Supabase에서 받은 기본 상태로 되돌리는 힘
+    const base = asset.baseIndex ?? asset.socialIndex;
+    const pullBack = (base - asset.socialIndex) * 0.01;
+
+    let next = asset.socialIndex + issueSpike + slowDrift + noise + pullBack;
+
+    asset.socialIndex = clamp01(next);
   });
 }
 
-// ====== 티커 렌더 ======
+// ✅ 정상성 지수를 0~100으로 만들어 주는 함수 (여기 반드시 있어야 함)
+function computeNormalityIndex(asset) {
+  // 스캔에서 계산한 socialIndex가 있으면 그걸 0~100으로 바로 사용
+  if (typeof asset.socialIndex === "number") {
+    let idx = asset.socialIndex * 100;
+    if (idx < 0) idx = 0;
+    if (idx > 100) idx = 100;
+    return idx;
+  }
+
+  // fallback: Supabase 없이 돌아갈 때만 예전 로직 사용
+  const normB = asset.B;
+  const normP = 1 - asset.P;
+  const idealD = 0.6;
+  const normD = 1 - Math.min(Math.abs(asset.D - idealD) / idealD, 1); // 0~1
+
+  let idx = (normB * 0.4 + normP * 0.4 + normD * 0.2) * 100;
+  if (idx < 0) idx = 0;
+  if (idx > 100) idx = 100;
+  return idx;
+}
+
+// ====== 자산 값 변화율 계산 ======
 function computeChangeRate(asset) {
-  const prev = asset.prevValue || asset.value;
-  const delta = asset.value - prev;
-  const rate = prev !== 0 ? (delta / prev) * 100 : 0;
+  const prev = asset.prevValue || asset.value; // 이전 값 (없으면 현재 값)
+  const delta = asset.value - prev; // 절대 변화량
+  const rate = prev !== 0 ? (delta / prev) * 100 : 0; // 변화율 %
+
   return { delta, rate };
 }
 
@@ -491,8 +602,7 @@ function renderTicker() {
     tickerPriceEl.classList.add("down");
     tickerRateEl.classList.add("down");
   }
-
-  tickerSubEl.textContent = "장내 자산 실시간 상장 상태.";
+  tickerSubEl.textContent = "스캔 결과와 연동된 장내 자산 시세입니다.";
 
   statOpenEl.textContent = firstOpen !== null ? formatNumber(firstOpen) : "-";
   statHighEl.textContent = globalHigh !== null ? formatNumber(globalHigh) : "-";
@@ -504,26 +614,25 @@ function renderTicker() {
 
 // ====== 스캔 파라미터(정제율/효율/기여도/등급) ======
 function computeScanParams(asset) {
-  // D, B, P 를 이용한 대략적인 매핑
-  const purity = Math.round(
-    (asset.D * 0.4 + asset.B * 0.3 + (1 - asset.P) * 0.3) * 100
-  );
+  const p = asset.P ?? 0.5;
+  const purity = Math.round((1 - p) * 100);
 
-  const efficiency = (asset.value / 100).toFixed(2);
+  const effRaw = typeof asset.E === "number" ? asset.E : asset.value / 100;
+  const efficiency = effRaw.toFixed(2);
 
-  let contributionScore = (asset.P * 0.6 + asset.D * 0.2 + asset.B * 0.2) * 100;
+  const sni = typeof asset.socialIndex === "number" ? asset.socialIndex : 0.5;
+  const score100 = Math.max(0, Math.min(1, sni)) * 100;
+
+  // 🔹 “스캔 시점 등급” (고정용)
   let contribution;
-  if (contributionScore > 85) contribution = "A+";
-  else if (contributionScore > 75) contribution = "A";
-  else if (contributionScore > 65) contribution = "B+";
-  else if (contributionScore > 55) contribution = "B";
+  if (score100 >= 85) contribution = "A+";
+  else if (score100 >= 70) contribution = "A";
+  else if (score100 >= 55) contribution = "B+";
+  else if (score100 >= 40) contribution = "B";
   else contribution = "C";
 
-  let level;
-  if (asset.value > 130) level = "Lv4";
-  else if (asset.value > 110) level = "Lv3";
-  else if (asset.value > 90) level = "Lv2";
-  else level = "Lv1";
+  // 🔥 레벨 = 사회 적응도 점수 (0~100) 숫자
+  const level = Math.round(score100);
 
   return { purity, efficiency, contribution, level };
 }
@@ -568,13 +677,15 @@ function renderScanParams() {
     metricContributionEl.classList.add("metric-warn");
   }
 
-  // 거래 등급 (Lv4 최고, Lv1 최저)
-  if (m.level === "Lv4" || m.level === "Lv3") {
-    metricLevelEl.classList.add("metric-good");
-  } else if (m.level === "Lv1") {
-    metricLevelEl.classList.add("metric-bad");
+  // 🔥 사회 적응도 레벨(0~100) 숫자 기준 색
+  const lvl = m.level; // 0~100
+
+  if (lvl >= 70) {
+    metricLevelEl.classList.add("metric-good"); // 안정 (초록)
+  } else if (lvl < 40) {
+    metricLevelEl.classList.add("metric-bad"); // 주의 (빨강)
   } else {
-    metricLevelEl.classList.add("metric-warn");
+    metricLevelEl.classList.add("metric-warn"); // 경계 (노랑)
   }
 
   // --- 장내 원천 지표 D/B/P 표시 ---
@@ -610,8 +721,64 @@ function renderScanParams() {
   if (tickerMetaEl) {
     tickerMetaEl.textContent =
       `정제율 ${m.purity}% · 사회 효율 환산가 ${m.efficiency}` +
-      ` · 사회 기여도 ${m.contribution} · 거래 등급 ${m.level}`;
+      ` · 사회 기여도 ${m.contribution} · 사회 적응도 지수 ${m.level}`;
   }
+}
+
+// 🔥 장내 5가지 사회 지표 중 "가장 높은 강점"을 계산하는 도우미들
+
+// 5개 지표 점수 계산 (0~1로 환산)
+function computeStrengthMetrics(asset) {
+  const D = asset.D ?? 0.6;
+  const B = asset.B ?? 0.5;
+  const P = asset.P ?? 0.5;
+  const E = typeof asset.E === "number" ? asset.E : (asset.value ?? 100) / 120; // 대사 효율 대충 value에서 환산
+
+  // 🔹 정상성 스펙트럼: scan.js에서 쓰던 socialIndex 기준 비슷하게
+  const normality = computeNormalityIndex(asset) / 100; // 0~1
+
+  // 🔹 규범 순응도: 유익도(B)↑ + 위험도(P)↓
+  const conformity = B * 0.7 + (1 - P) * 0.3;
+
+  // 🔹 공동체 유지 에너지: 다양성이 너무 치우치지 않을 때 ↑
+  const idealD = 0.6;
+  const cohesion = 1 - Math.min(Math.abs(D - idealD) / idealD, 1); // 0~1
+
+  // 🔹 사회 염증 지수: 염증이 낮을수록 강점이므로 (1 - P)
+  const lowInflamm = 1 - P;
+
+  // 🔹 사회 대사 효율: 에너지 효율(E)을 0~1로 클램프
+  const metabolism = Math.max(0, Math.min(1, E));
+
+  return { normality, conformity, cohesion, lowInflamm, metabolism };
+}
+
+// 이 자산의 "강점 지표 이름 + 퍼센트" 문자열 생성
+// 이 자산의 "강점 지표 이름 + 퍼센트"를 분리해서 반환
+function getStrongestMetric(asset) {
+  const m = computeStrengthMetrics(asset);
+
+  const defs = [
+    { key: "normality", label: "정상성 스펙트럼" },
+    { key: "conformity", label: "규범 순응도" },
+    { key: "cohesion", label: "공동체 유지 에너지" },
+    { key: "lowInflamm", label: "사회 염증 지수" },
+    { key: "metabolism", label: "사회 대사 효율" },
+  ];
+
+  let best = defs[0];
+  defs.forEach((d) => {
+    if ((m[d.key] ?? 0) > (m[best.key] ?? 0)) best = d;
+  });
+
+  // 🔥 내부 점수(0~1)를 화면용 30~90%로 압축
+  const raw = Math.max(0, Math.min(1, m[best.key] ?? 0)); // 0~1
+  const score = Math.round(30 + raw * 60); // 30~90
+
+  return {
+    label: best.label, // 지표 이름
+    score, // 숫자만 (정수)
+  };
 }
 
 function renderComparisonTable() {
@@ -622,85 +789,153 @@ function renderComparisonTable() {
   const mainAsset = getMainAsset();
   const mainId = mainAsset ? mainAsset.id : null;
 
-  // 1) 모든 자산을 value 기준으로 정렬 (가치 높은 순)
+  // 1) value 기준 정렬
   const sorted = assets
     .map((asset) => {
-      const m = computeScanParams(asset);
-      const delta = asset.value - asset.prevValue;
+      const scan = computeScanParams(asset);
+      const { delta } = computeChangeRate(asset);
       const deltaLabel = (delta >= 0 ? "+" : "") + formatNumber(delta);
 
       let deltaClass = "neutral";
       if (delta > 0.05) deltaClass = "up";
       else if (delta < -0.05) deltaClass = "down";
 
-      return { asset, m, delta, deltaLabel, deltaClass };
+      return { asset, scan, deltaLabel, deltaClass };
     })
     .sort((a, b) => b.asset.value - a.asset.value);
 
-  // 2) 메인 ID의 현재 순위 찾기
+  if (sorted.length === 0) return;
+
+  // 🔥 현재 분포에서 상대 레벨(0~100) 계산용
+  const maxVal = sorted[0].asset.value;
+  const minVal = sorted[sorted.length - 1].asset.value;
+  const span = Math.max(maxVal - minVal, 1);
+
+  function getRelativeLevel(v) {
+    return ((v - minVal) / span) * 100; // 0~100
+  }
+
+  // 2) 메인 ID 위치 찾기
   const mainIndex = mainId
     ? sorted.findIndex((row) => row.asset.id === mainId)
     : -1;
 
-  // 메인 ID가 못 잡혔으면 (이상한 경우) 그냥 상위 8개 보여주기
-  if (mainIndex === -1) {
-    sorted.slice(0, 8).forEach((row) => {
-      const { asset, m, deltaLabel, deltaClass } = row;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${asset.id}</td>
-        <td>${asset.name}</td>
-        <td class="val">${formatNumber(asset.value)}</td>
-        <td class="val ${deltaClass}">${deltaLabel}</td>
-        <td>${asset.theme}</td>
-        <td>${m.contribution}</td>
-        <td>${m.level}</td>
-      `;
-      comparisonBodyEl.appendChild(tr);
-    });
-    return;
-  }
-
-  // 3) 메인 ID를 기준으로 위 / 아래 사람들만 보여주는 윈도우 만들기
-  const WINDOW_ROWS = 7; // 총 몇 줄 보여줄지 (위 3, 자기, 아래 3)
+  const WINDOW_ROWS = 6;
   const HALF = Math.floor(WINDOW_ROWS / 2);
 
-  let start = mainIndex - HALF;
-  let end = mainIndex + HALF + 1;
+  let windowRows;
+  if (mainIndex === -1) {
+    windowRows = sorted.slice(0, WINDOW_ROWS);
+  } else {
+    let start = mainIndex - HALF;
+    let end = mainIndex + HALF + 1;
 
-  // 범위 보정 (0 이하, 끝 넘어가는 경우)
-  if (start < 0) {
-    start = 0;
-    end = Math.min(WINDOW_ROWS, sorted.length);
-  } else if (end > sorted.length) {
-    end = sorted.length;
-    start = Math.max(0, end - WINDOW_ROWS);
+    if (start < 0) {
+      start = 0;
+      end = Math.min(WINDOW_ROWS, sorted.length);
+    } else if (end > sorted.length) {
+      end = sorted.length;
+      start = Math.max(0, end - WINDOW_ROWS);
+    }
+
+    windowRows = sorted.slice(start, end);
   }
 
-  const windowRows = sorted.slice(start, end);
-
-  // 4) 테이블 렌더 + 메인 ID 강조
-  windowRows.forEach((row) => {
-    const { asset, m, deltaLabel, deltaClass } = row;
+  // 3) 테이블 렌더
+  windowRows.forEach(({ asset, scan, deltaLabel, deltaClass }) => {
     const tr = document.createElement("tr");
 
     const isMain = asset.id === mainId;
-    if (isMain) {
-      tr.classList.add("is-main-asset");
-    }
+    if (isMain) tr.classList.add("is-main-asset");
+
+    // 🔹 강점 지표 (이름 + 숫자 분리)
+    const strongest = getStrongestMetric(asset); // { label, score }
+
+    // 🔹 스캔 시점 등급 (A+/A/B+/B/C 유지)
+    const grade = asset.initialGrade || scan.contribution;
+
+    // 🔹 상대 레벨 (현재 value 기준)
+    const relLevel = getRelativeLevel(asset.value);
+
+    // 🔹 레벨 색: 3등분 (0~33 / 33~66 / 66~100)
+    let levelClass = "";
+    if (relLevel >= 66) levelClass = "level-high";
+    else if (relLevel >= 33) levelClass = "level-mid";
+    else levelClass = "level-low";
 
     tr.innerHTML = `
       <td>${asset.id}</td>
-      <td>${asset.name}</td>
-      <td class="val">${formatNumber(asset.value)}</td>
+      <td class="metric-cell">
+        <span class="metric-label">${strongest.label}</span>
+        <span class="metric-score">${strongest.score}%</span>
+      </td>
+      <td class="val val-price">${formatNumber(asset.value)}</td>
       <td class="val ${deltaClass}">${deltaLabel}</td>
-      <td>${asset.theme}</td>
-      <td>${m.contribution}</td>
-      <td>${m.level}</td>
+      <td>${grade}</td>
+      <td class="val ${levelClass}">${relLevel.toFixed(1)}</td>
     `;
 
     comparisonBodyEl.appendChild(tr);
   });
+}
+
+function buildIssueImpactSummary(issue) {
+  if (!issue) return "";
+
+  const up = [];
+  const down = [];
+
+  THEMES.forEach((theme) => {
+    const w = issue.weightMap[theme] ?? 0;
+    if (w > 0.1) up.push(theme); // 가치 상승
+    else if (w < -0.1) down.push(theme); // 가치 하락
+  });
+
+  if (up.length === 0 && down.length === 0) return "";
+
+  const parts = [];
+
+  if (up.length > 0) {
+    parts.push(
+      `<span class="issue-impact-up" style="color:${COLOR_UP};">가치 상승: ${up.join(
+        ", "
+      )}</span>`
+    );
+  }
+  if (down.length > 0) {
+    parts.push(
+      `<span class="issue-impact-down" style="color:${COLOR_DOWN};">가치 하락: ${down.join(
+        ", "
+      )}</span>`
+    );
+  }
+
+  return parts.join(" · ");
+}
+
+function renderIssue(issue) {
+  if (!issueTagEl || !issueTextEl) return;
+  if (!issue) {
+    issueTagEl.textContent = "";
+    issueTextEl.textContent = "";
+    return;
+  }
+
+  issueTagEl.textContent = issue.tag;
+
+  const impactSummary = buildIssueImpactSummary(issue);
+
+  // 🔥 뉴스 원문 + 영향 요약을 같이 표시 (요약은 색깔 span)
+  if (impactSummary) {
+    issueTextEl.innerHTML = `
+      <span class="issue-main-text">${issue.text}</span>
+      <span class="issue-impact-sep"> / </span>
+      <span class="issue-impact">${impactSummary}</span>
+    `;
+  } else {
+    // 영향 요약 없으면 기존처럼 텍스트만
+    issueTextEl.textContent = issue.text;
+  }
 }
 
 // ====== 이슈 / 상태 ======
@@ -729,12 +964,6 @@ function renderWeights(issue) {
   });
 }
 
-function renderIssue(issue) {
-  if (!issueTagEl || !issueTextEl) return;
-  issueTagEl.textContent = issue.tag;
-  issueTextEl.textContent = issue.text;
-}
-
 function renderTick() {
   if (!tickInfoEl) return;
   tickInfoEl.textContent = `Tick: ${tick}`;
@@ -754,7 +983,7 @@ function initPriceChart() {
   // 초기 배열 비우기
   candleData = [];
   lineData = [];
-  volumeData = []; // ← 이건 아래 indicator에서 쓸 거라 놔두되, 여기서는 안 그림
+  volumeData = [];
 
   const ctx = canvas.getContext("2d");
 
@@ -800,16 +1029,29 @@ function initPriceChart() {
       scales: {
         x: {
           type: "linear",
-          ticks: { display: false },
-          grid: { display: false },
+          ticks: {
+            display: false,
+            stepSize: GRID_X_STEP, // ✅ 세로 그리드 위치 고정 (0,10,20,...)
+          },
+          grid: {
+            color: "rgba(148,163,184,0.28)",
+            drawOnChartArea: true,
+          },
           offset: false,
           min: 0,
-          max: 60, // 처음엔 0~60 대충 범위
+          max: 60,
         },
         yPrice: {
           position: "right",
-          ticks: { color: "#e5e7eb" },
+          ticks: {
+            color: "#FAF2E5",
+            font: AXIS_FONT,
+            count: GRID_Y_TICKS_PRICE, // ★ 12줄
+          },
           grid: { color: "rgba(148,163,184,0.3)" },
+          afterFit(scale) {
+            scale.width = RIGHT_AXIS_WIDTH;
+          },
         },
       },
     },
@@ -859,25 +1101,13 @@ function updatePriceChart() {
     const WINDOW = 60;
 
     const xScale = priceChart.options.scales.x;
-    xScale.max = lastX + 0.5;
-    xScale.min = lastX - (WINDOW - 0.5);
+
+    // 🔥 항상 0에서 시작, 오른쪽으로만 확장
+    xScale.min = 0;
+    xScale.max = Math.max(WINDOW, lastX + 1);
   }
 
   priceChart.update();
-}
-
-// ====== 인디케이터 차트 (정상성 지수) ======
-function computeNormalityIndex(asset) {
-  // D(다양성), B(유익), P(유해)를 조합한 0~100 지수
-  const normB = asset.B;
-  const normP = 1 - asset.P;
-  const idealD = 0.6;
-  const normD = 1 - Math.min(Math.abs(asset.D - idealD) / idealD, 1); // 0~1
-
-  let idx = (normB * 0.4 + normP * 0.4 + normD * 0.2) * 100;
-  if (idx < 0) idx = 0;
-  if (idx > 100) idx = 100;
-  return idx;
 }
 
 function initVolumeChart() {
@@ -886,21 +1116,11 @@ function initVolumeChart() {
 
   const ctx = canvas.getContext("2d");
 
-  // 🔹 위 캔들 차트에서 실제 색을 가져온다
-  const candleDataset = priceChart?.data?.datasets?.[0];
-  const upColor =
-    (candleDataset && candleDataset.color && candleDataset.color.up) ||
-    "#4ade80";
-  const downColor =
-    (candleDataset && candleDataset.color && candleDataset.color.down) ||
-    "#f97373";
-
   volumeChart = new Chart(ctx, {
     type: "bar",
     data: {
       datasets: [
         {
-          // 🔹 하단 막대 (캔들과 같은 색)
           type: "bar",
           label: "Δ Volume",
           data: volumeData,
@@ -911,12 +1131,10 @@ function initVolumeChart() {
           backgroundColor: (ctx) => {
             const v = ctx.raw;
             if (!v) return "rgba(148,163,184,0.4)";
-
             return v.dir === "up" ? COLOR_UP : COLOR_DOWN;
           },
         },
         {
-          // 🔹 하단 라인 (Δ 라인)
           type: "line",
           label: "Δ Line",
           data: volumeData,
@@ -938,14 +1156,30 @@ function initVolumeChart() {
       scales: {
         x: {
           type: "linear",
-          ticks: { display: false },
-          grid: { display: false },
-          offset: false, // 🔹 위 priceChart랑 똑같이
+          ticks: {
+            display: false,
+            stepSize: GRID_X_STEP, // ✅ 동일
+          },
+          grid: {
+            color: "rgba(148,163,184,0.28)",
+            drawOnChartArea: true,
+          },
         },
         yVol: {
           position: "right",
-          ticks: { display: false },
-          grid: { display: false },
+          ticks: {
+            display: true,
+            color: "#FAF2E5",
+            font: AXIS_FONT,
+            count: GRID_Y_TICKS_BOTTOM, // ★ 6줄
+          },
+          grid: {
+            color: "rgba(148,163,184,0.28)",
+            drawOnChartArea: true, // ★ 가로 그리드 보이게
+          },
+          afterFit(scale) {
+            scale.width = RIGHT_AXIS_WIDTH;
+          },
         },
       },
     },
@@ -963,8 +1197,9 @@ function updateVolumeChart() {
     const WINDOW = 60;
     const xScale = volumeChart.options.scales.x;
 
-    xScale.max = lastX + 0.5;
-    xScale.min = lastX - (WINDOW - 0.5);
+    // 🔥 위 그래프랑 동일하게: 0에서 시작, 오른쪽으로만 확장
+    xScale.min = 0;
+    xScale.max = Math.max(WINDOW, lastX + 1);
   }
 
   volumeChart.update("none");
@@ -975,7 +1210,6 @@ function initIndicatorChart() {
   if (!canvas) return;
 
   const ctx = canvas.getContext("2d");
-
   indicatorData = [];
 
   indicatorChart = new Chart(ctx, {
@@ -1002,21 +1236,34 @@ function initIndicatorChart() {
         legend: { display: false },
       },
       scales: {
+        // ✅ 세로 그리드 x 위치를 위/아래랑 완전히 동일하게
         x: {
           type: "linear",
-          ticks: { display: false },
-          grid: { display: false },
+          ticks: {
+            display: false,
+            stepSize: GRID_X_STEP, // ★ 추가
+          },
+          grid: {
+            color: "rgba(148,163,184,0.28)",
+            drawOnChartArea: true,
+          },
+          // price / volume 처럼 업데이트에서 min/max를 건드리니까
+          // 여기서 min/max는 안 줘도 됨
         },
         yIdx: {
           position: "right",
           min: 0,
           max: 100,
           ticks: {
-            color: "#e5e7eb",
-            font: { size: 9 },
+            color: "#FAF2E5",
+            font: AXIS_FONT,
+            count: GRID_Y_TICKS_BOTTOM, // ★ 6줄
           },
           grid: {
             color: "rgba(148,163,184,0.25)",
+          },
+          afterFit(scale) {
+            scale.width = RIGHT_AXIS_WIDTH;
           },
         },
       },
@@ -1048,8 +1295,9 @@ function updateIndicatorChart() {
     const WINDOW = 60;
     const xScale = indicatorChart.options.scales.x;
 
-    xScale.max = lastX + 0.5;
-    xScale.min = lastX - (WINDOW - 0.5);
+    // 🔥 나머지 인디케이터도 동일한 타임라인
+    xScale.min = 0;
+    xScale.max = Math.max(WINDOW, lastX + 1);
   }
 
   indicatorChart.update("none");
@@ -1086,11 +1334,11 @@ function step() {
 }
 
 // ====== 초기화 ======
-function init() {
+async function init() {
   tickInfoEl = document.getElementById("tickInfo"); // 없어도 무방
   issueTagEl = document.getElementById("issueTag");
   issueTextEl = document.getElementById("issueText");
-  weightListEl = document.getElementById("weightList"); // 없으면 생략
+  weightListEl = document.getElementById("weightList");
 
   tickerIdEl = document.getElementById("tickerId");
   tickerPriceEl = document.getElementById("tickerPrice");
@@ -1114,11 +1362,11 @@ function init() {
   metricContributionEl = document.getElementById("metricContribution");
   metricLevelEl = document.getElementById("metricLevel");
 
-  metricDiversityEl = document.getElementById("metricDiversity"); // 🔹 추가
-  metricBenefitEl = document.getElementById("metricBenefit"); // 🔹 추가
+  metricDiversityEl = document.getElementById("metricDiversity");
+  metricBenefitEl = document.getElementById("metricBenefit");
   metricRiskEl = document.getElementById("metricRisk");
 
-  comparisonBodyEl = document.getElementById("comparisonBody"); // ✅ 추가
+  comparisonBodyEl = document.getElementById("comparisonBody");
 
   // 상단 시간 표시
   if (marketTimeEl) {
@@ -1140,7 +1388,18 @@ function init() {
     setInterval(updateTime, 1000);
   }
 
-  // 초기 이슈/티커/파라미터/차트 세팅
+  // ✅ 먼저 Supabase에서 최신 스캔 결과로 assets[0] 덮어쓰기
+  await syncMainAssetFromSupabase();
+
+  // 🔥 스캔 시점 등급을 한번만 저장
+  assets.forEach((asset) => {
+    if (asset.initialGrade == null) {
+      const m = computeScanParams(asset);
+      asset.initialGrade = m.contribution; // A+/A/B+/B/C 고정
+    }
+  });
+
+  // 그 다음 이슈/티커/파라미터/차트 세팅
   currentIssue = pickNewIssue(null);
   renderIssue(currentIssue);
   renderWeights(currentIssue);
@@ -1149,12 +1408,12 @@ function init() {
   renderComparisonTable();
 
   initPriceChart();
-
   initVolumeChart();
-
   initIndicatorChart();
 
   setInterval(step, TICK_INTERVAL_MS);
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  init();
+});

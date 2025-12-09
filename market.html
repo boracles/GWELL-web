@@ -132,25 +132,19 @@
           </section>
 
           <section class="chart-panel">
-            <div class="chart-panel">
-              <!-- 🔹 캔들 + 볼륨: 같은 구역 -->
-              <div class="chart-main">
-                <div class="chart-main-top">
-                  <canvas id="priceChart"></canvas>
-                  <!-- 캔들 -->
-                </div>
-                <div class="chart-main-bottom">
-                  <canvas id="volumeChart"></canvas>
-                  <!-- 막대 -->
-                </div>
+            <div class="chart-main">
+              <div class="chart-main-top">
+                <canvas id="priceChart"></canvas>
               </div>
-
-              <!-- 🔹 아래 별도: 정상성 지수 인디케이터 -->
-              <section class="chart-indicator">
-                <div class="indicator-label">정상성 지수</div>
-                <canvas id="indicatorChart"></canvas>
-              </section>
+              <div class="chart-main-bottom">
+                <canvas id="volumeChart"></canvas>
+              </div>
             </div>
+
+            <section class="chart-indicator">
+              <div class="indicator-label">정상성 지수</div>
+              <canvas id="indicatorChart"></canvas>
+            </section>
           </section>
 
           <!-- ID별 가치 비교 테이블 -->
@@ -160,14 +154,15 @@
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>프로필</th>
-                  <th>Value</th>
-                  <th>Δ</th>
-                  <th>Theme</th>
-                  <th>사회 기여도</th>
-                  <th>거래 등급</th>
+                  <th>강점</th>
+                  <!-- 프로필 텍스트 대신 -->
+                  <th>가치</th>
+                  <th>변동</th>
+                  <th>등급</th>
+                  <th>레벨</th>
                 </tr>
               </thead>
+
               <tbody id="comparisonBody"></tbody>
             </table>
           </section>

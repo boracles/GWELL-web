@@ -98,8 +98,8 @@ body {
   --border-soft: rgba(148, 163, 184, 0.4);
   --accent: #6d5dfc;
   --accent-soft: rgba(109, 93, 252, 0.1);
-  --green: #4ade80;
-  --red: #f97373;
+  --green: #0d7c64; /* ✅ */
+  --red: #80233b; /* ✅ */
 }
 
 /* ==========================
@@ -1508,6 +1508,23 @@ body.result-mode .scan-global-footer {
   opacity: 0.9;
 }
 
+.issue-impact {
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.issue-impact-sep {
+  margin: 0 4px;
+  opacity: 0.6;
+}
+
+.issue-impact-up,
+.issue-impact-down {
+  font-weight: 700;
+}
+
 .app-main-layout {
   display: flex;
   gap: 16px;
@@ -1813,6 +1830,14 @@ body.result-mode .scan-global-footer {
 
 .market-table td.val {
   font-variant-numeric: tabular-nums;
+}
+
+.market-table td.val.up {
+  color: #0d7c64; /* ✅ */
+}
+
+.market-table td.val.down {
+  color: #80233b; /* ✅ */
 }
 
 .val.up {
@@ -2148,28 +2173,25 @@ body.result-mode .scan-global-footer {
 }
 
 /* 시세/파라미터 good/bad 색 클래스 */
-
 .stat-good {
-  color: #22c55e; /* 좋은 쪽: 초록 */
+  color: #0d7c64; /* ✅ */
 }
-
 .stat-bad {
-  color: #f97373; /* 나쁜 쪽: 빨강 */
+  color: #80233b; /* ✅ */
 }
-
 .stat-warn {
-  color: #fbbf24; /* 애매/주의: 노랑 */
+  color: #ffaa2b; /* ✅ */
 }
 
 /* 정제율/기여도 같은 파라미터에도 재사용 */
 .metric-good {
-  color: #0fedbe;
+  color: #0d7c64; /* ✅ */
 }
 .metric-bad {
-  color: #f63c6b;
+  color: #80233b; /* ✅ */
 }
 .metric-warn {
-  color: #fbbf24;
+  color: #ffaa2b; /* ✅ */
 }
 
 /* ==========================
@@ -2209,13 +2231,13 @@ body.result-mode .scan-global-footer {
 .ticker-delta.up,
 .ticker-price.up,
 .ticker-rate.up {
-  color: #0fedbe;
+  color: #0d7c64; /* ✅ */
 }
 
 .ticker-delta.down,
 .ticker-price.down,
 .ticker-rate.down {
-  color: #f63c6b;
+  color: #80233b; /* ✅ */
 }
 
 /* 서브 텍스트/메타도 살짝 키우기 */
@@ -2299,15 +2321,24 @@ body.result-mode .scan-global-footer {
 }
 
 .chart-main {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  background: #050816; /* 한 박스 배경 하나만 */
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  height: 320px; /* 필요하면 수치만 조절 */
-  overflow: hidden;
+  gap: 0; /* 🔹 여기 간격도 0 */
+  min-height: 0;
+}
+
+/* 위: 캔들, 아래: 거래량 비율 (3 : 1 정도) */
+.chart-main-top {
+  flex: 3 1 0;
+  min-height: 0;
+  background: transparent;
+}
+
+.chart-main-bottom {
+  flex: 1 1 0;
+  min-height: 0;
+  background: transparent;
 }
 
 .chart-main canvas {
@@ -2319,23 +2350,36 @@ body.result-mode .scan-global-footer {
 /* ====== 캔들 + 볼륨 2층 레이아웃 ====== */
 
 .chart-panel {
-  flex: 0 0 auto;
-  display: Grid;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-/* 아래 인디케이터 */
-.chart-indicator {
-  background: #140823;
-  opacity: 0.6;
-  padding: 8px 10px 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  height: 90px;
+  gap: 0; /* 🔹 위/아래 간격 제거 */
+  flex: 1.6;
+  min-height: 320px;
+  background: transparent;
+}
+
+/* 아래: 정상성 지수 인디케이터 높이 */
+.chart-indicator {
+  flex: 0 0 70px;
+  min-height: 60px;
+  background: transparent;
+  margin-top: 0; /* 🔹 여백 제거 */
+}
+
+/* 세 개 차트 캔버스의 가로폭/정렬 완전 통일 */
+#priceChart,
+#volumeChart,
+#indicatorChart {
+  display: block; /* inline 여백 제거 */
+  width: 100% !important;
+}
+
+/* 캔들/볼륨/정상성 차트 컨테이너도 같은 폭 */
+.chart-main-top,
+.chart-main-bottom,
+.chart-indicator {
+  position: relative;
+  width: 100%;
 }
 
 .indicator-label {
@@ -2365,25 +2409,31 @@ section {
 /* ==========================
    ID별 가치 비교 테이블
 ========================== */
-
 .comparison-panel {
-  flex: 1; /* ✅ 남는 세로공간을 이쪽이 먹게 */
+  flex: 0.6;
   display: flex;
   flex-direction: column;
-  margin-top: 4px;
-  background: #020617;
-  border-radius: 10px;
+  margin-top: 16px;
+
+  background: #000000; /* 🔹 배경색 변경 */
+  border-radius: 0; /* 🔹 라운드 제거 */
   border: none;
+
   padding: 4px 10px 6px;
+
+  margin-left: -12px;
 }
 
 .comparison-title {
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  opacity: 0.75;
-  margin-bottom: 4px;
-  color: #c4b5fd;
+  opacity: 1;
+  margin-bottom: 6px;
+  color: #faf2e5;
+
+  margin-left: 4px;
 }
 
 .comparison-table {
@@ -2394,7 +2444,7 @@ section {
 }
 
 .comparison-table thead {
-  background: rgba(15, 23, 42, 0.95);
+  background: rgba(0, 0, 0, 0.95);
 }
 
 .comparison-table th,
@@ -2408,15 +2458,15 @@ section {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   opacity: 0.8;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+  border-bottom: 1px solid rgba(250, 242, 231, 0.9);
 }
 
 .comparison-table tbody tr:nth-child(even) {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .comparison-table tbody tr:nth-child(odd) {
-  background: rgba(15, 23, 42, 0.3);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .comparison-table td.val {
@@ -2424,15 +2474,15 @@ section {
 }
 
 .comparison-table td.val.up {
-  color: #4ade80;
+  color: #0d7c64; /* ✅ */
 }
 
 .comparison-table td.val.down {
-  color: #f97373;
+  color: #80233b; /* ✅ */
 }
 
 .comparison-table td.val.neutral {
-  color: #e5e7eb;
+  color: #faf2e5;
 }
 
 /* 반응형 */
@@ -2663,7 +2713,7 @@ body.result-mode #scanRoot {
 .comparison-table tbody tr.is-main-asset {
   position: relative;
   background: rgba(168, 85, 247, 0.14); /* 연보라 글로우 같은 배경 */
-  border-left: 3px solid #a855f7; /* 보라색 인디케이터 */
+  border-left: 3px solid #6b1ba0; /* 보라색 인디케이터 */
   border-right: 3px solid #a855f7;
   transition: background 0.3s ease;
 }
@@ -2815,4 +2865,64 @@ body.listing-complete #subMessage {
   font-weight: 700;
   line-height: 1.6;
   color: #fdf6ec;
+}
+
+/* 장내 자산 상대 가치 분포 – 레벨 색상 */
+.grade-A {
+  color: #0d7c64; /* 안정 A – 초록 */
+  font-weight: 700;
+}
+
+.grade-B {
+  color: #ffaa2b; /* 경계 B – 노랑 */
+  font-weight: 700;
+}
+
+.grade-C {
+  color: #80233b; /* 주의 C – 빨강 */
+  font-weight: 700;
+}
+
+/* 장내 자산 상대 가치 분포 – 레벨 색상 (0~100 숫자용) */
+.level-high {
+  color: #0d7c64; /* 상위 1/3 – 초록 */
+  font-weight: 700;
+}
+
+.level-mid {
+  color: #ffaa2b; /* 중간 1/3 – 노랑 */
+  font-weight: 700;
+}
+
+.level-low {
+  color: #80233b; /* 하위 1/3 – 빨강 */
+  font-weight: 700;
+}
+
+/* 상대 가치 분포 테이블의 '가치' 숫자 색을 상단 티커와 맞추기 */
+.val-price {
+  color: #431e75; /* ticker-price와 동일한 보라색 */
+  font-weight: 700;
+}
+
+/* 장내 자산 상대 가치 분포 – 강점 지표 셀 레이아웃 */
+.comparison-table td.metric-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+
+/* 지표 이름: 고정 폭(예: 9em)으로 통일 */
+.metric-label {
+  flex: 0 0 9em; /* 숫자 조절해서 네 눈에 맞게, 8~11em 정도 */
+  white-space: nowrap; /* 줄바꿈 방지 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 숫자(%)는 오른쪽 정렬 */
+.metric-score {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
 }
