@@ -834,8 +834,8 @@ function setPhase(phase) {
       if (scanMainMessageEl) scanMainMessageEl.style.display = "block"; // 🔹 이 줄 추가
       if (sensorSimEl) sensorSimEl.style.display = "flex";
 
-      mainMessageEl.textContent = "초기 상태를 측정하고 있습니다.";
-      subMessageEl.textContent = "몇 초간 안정된 자세를 유지해 주세요.";
+      mainMessageEl.textContent = "";
+      subMessageEl.textContent = "";
       secondaryMessageEl.textContent = "";
       scanBgEl.className = "scan-bg particles";
       scanBgEl.style.opacity = 0.7;
@@ -1587,40 +1587,114 @@ function renderAnalysisResult() {
   const conflictGrade = gradeFromScore(conflictScore, true);
   const productivityGrade = gradeFromScore(productivityScore);
 
-  const diversityText =
-    diversityScore >= 0.7
-      ? "다양한 미생물이 공존하고 있습니다. 여러 정체성이 공존하는 포용적 사회에 가깝습니다."
-      : diversityScore >= 0.4
-      ? "다양성은 유지되지만 일부 종이 과도하게 우세합니다. 특정 정상성이 강하게 작동하는 상태입니다."
-      : "장내 다양성이 낮아 획일화된 생태계에 가깝습니다. 한 가지 기준만 강요되는 상태로 읽힙니다.";
+  // 🔥 등급에 따라 아이콘 파일 선택 (Gut_1_A.svg / Gut_1_B.svg / Gut_1_C.svg ...)
+  const diversityIcon = `Gut_1_${diversityGrade}`;
+  const conformityIcon = `Gut_2_${conformityGrade}`;
+  const cohesionIcon = `Gut_3_${cohesionGrade}`;
+  const conflictIcon = `Gut_4_${conflictGrade}`;
+  const productivityIcon = `Gut_5_${productivityGrade}`;
 
-  const conformityText =
-    conformityScore >= 0.7
-      ? "유익균 비율이 높고 병원성 미생물은 낮은 편입니다. 규범을 잘 따르는 순응형 시민에 가까운 프로파일입니다."
-      : conformityScore >= 0.4
-      ? "유익균과 잠재적 병원균이 섞여 있습니다. 대체로 규범에 맞지만 때때로 경계 대상이 되는 존재입니다."
-      : "병원성·잠재적 유해균 비율이 높습니다. 사회가 쉽게 '문제적'으로 낙인찍을 수 있는 몸의 상태입니다.";
+  // === 5개 지표 설명 + 등급별 상태 문장 ===
 
-  const cohesionText =
-    cohesionScore >= 0.7
-      ? "SCFA(특히 Butyrate) 생산이 활발해 공동체 결속 에너지가 높은 상태입니다."
-      : cohesionScore >= 0.4
-      ? "기초 에너지는 유지되지만 결속력이 흔들릴 수 있는 수준입니다."
-      : "SCFA 생산이 떨어져 서로를 지탱할 힘이 부족한 상태입니다.";
+  // 1) 정상성 스펙트럼 (Diversity)
+  const diversityBaseText =
+    "장내 미생물 다양성은 외부 자극에 대한 회복탄력성을 반영합니다.";
+  let diversityGradeText;
+  switch ((diversityGrade || "").charAt(0)) {
+    case "A":
+      diversityGradeText =
+        "현재 지표는 A 등급으로, 미생물 군집이 폭넓게 분포하면서도 과잉 증식된 단일 균 군집이 적어, 사회·환경적 변화에도 비교적 유연하게 적응할 수 있는 고안정성 프로파일로 분류됩니다.";
+      break;
+    case "C":
+      diversityGradeText =
+        "현재 지표는 C 등급으로, 특정 균 군집에 편중된 단순화된 구조를 보여 작은 환경 변화에도 전체 시스템이 급격히 쏠리거나 붕괴될 위험이 높습니다.";
+      break;
+    default:
+      diversityGradeText =
+        "현재 지표는 B 등급으로, 기본적인 다양성은 유지되지만 일부 균 군집이 우세하여 상황에 따라 특정 성향이 과장되게 드러날 수 있는 상태입니다.";
+      break;
+  }
+  const diversityText = `${diversityBaseText} ${diversityGradeText}`;
 
-  const conflictText =
-    conflictScore >= 0.7
-      ? "LPS와 염증성 사이토카인이 높아 만성 염증 상태입니다. 혐오·갈등이 일상화된 분열 상태로 볼 수 있습니다."
-      : conflictScore >= 0.4
-      ? "염증 지표가 다소 상승한 상태입니다. 갈등 이슈가 반복적으로 나타나는 국면입니다."
-      : "염증 지표가 낮아 비교적 안정적인 상태입니다. 갈등이 생겨도 빠르게 봉합되는 편입니다.";
+  // 2) 규범 순응도 (Conformity)
+  const conformityBaseText =
+    "유익균과 잠재적 염증 유도균의 균형은 신체가 규범·환경 변화에 얼마나 안정적으로 반응하는지를 보여줍니다.";
+  let conformityGradeText;
+  switch ((conformityGrade || "").charAt(0)) {
+    case "A":
+      conformityGradeText =
+        "현재 지표는 A 등급으로, 기본 규범과 생활 리듬에 대한 순응도가 높으면서도 과도한 경직이나 방어 반응은 적은 상태입니다.";
+      break;
+    case "C":
+      conformityGradeText =
+        "현재 지표는 C 등급으로, 잠재적 유해균과 염증 관련 인자의 영향력이 커 규범적 요구에 대해 과민하거나 급격한 거부 반응이 나타날 수 있는 상태입니다.";
+      break;
+    default:
+      conformityGradeText =
+        "현재 지표는 B 등급으로, 상황에 따라 규범을 잘 따르기도 하지만 피로도와 스트레스가 누적되면 예측하기 어려운 이탈이나 저항 반응이 증가할 수 있습니다.";
+      break;
+  }
+  const conformityText = `${conformityBaseText} ${conformityGradeText}`;
 
-  const productivityText =
-    productivityScore >= 0.7
-      ? "대사 효율이 높아 에너지를 충분히 확보한 상태입니다. 고효율·고생산성을 강하게 요구받는 위치입니다."
-      : productivityScore >= 0.4
-      ? "필수 기능을 수행할 만큼의 대사 효율을 유지하고 있습니다. 평균적인 생산성을 가진 시민입니다."
-      : "대사 효율이 낮아 에너지 확보가 버겁습니다. 에너지 대사율이 '비효율적'입니다.";
+  // 3) 공동체 유지 에너지 (Cohesion / SCFA)
+  const cohesionBaseText =
+    "SCFA 생산량은 장내 대사·면역 조절의 핵심으로, 내부 시스템의 지지력과 결속 에너지를 나타냅니다.";
+  let cohesionGradeText;
+  switch ((cohesionGrade || "").charAt(0)) {
+    case "A":
+      cohesionGradeText =
+        "현재 지표는 A 등급으로, 장점막 보호와 항염 작용에 필요한 에너지가 충분히 생산·순환되고 있습니다.";
+      break;
+    case "C":
+      cohesionGradeText =
+        "현재 지표는 C 등급으로, SCFA 생산이 부족해 기본적인 회복과 재생 과정에서 에너지 결손이 발생할 수 있는 상태입니다.";
+      break;
+    default:
+      cohesionGradeText =
+        "현재 지표는 B 등급으로, 일상적인 회복과 관계 유지에는 충분하지만, 장기적인 과부하나 반복된 갈등 상황에서는 쉽게 약해질 수 있는 상태입니다.";
+      break;
+  }
+  const cohesionText = `${cohesionBaseText} ${cohesionGradeText}`;
+
+  // 4) 사회 염증 지수 (Conflict / LPS & Cytokine)
+  const conflictBaseText =
+    "LPS·염증성 사이토카인의 증가는 위협에 대한 경계·갈등 반응성을 나타내며, 민감도가 높을수록 반응이 과장될 수 있습니다.";
+  let conflictGradeText;
+  switch ((conflictGrade || "").charAt(0)) {
+    case "A":
+      conflictGradeText =
+        "현재 지표는 A 등급으로, 필요 시에는 방어 반응을 가동하되, 자극이 사라지면 비교적 빠르게 염증을 해소할 수 있는 안정적인 패턴입니다.";
+      break;
+    case "C":
+      conflictGradeText =
+        "현재 지표는 C 등급으로, 작은 자극에도 염증 반응이 길게 이어질 수 있는 고경계·고피로 상태입니다.";
+      break;
+    default:
+      conflictGradeText =
+        "현재 지표는 B 등급으로, 평상시에는 안정적이지만 스트레스가 누적될 경우 방어 반응이 급격히 상승했다가 가라앉는 패턴을 보일 수 있습니다.";
+      break;
+  }
+  const conflictText = `${conflictBaseText} ${conflictGradeText}`;
+
+  // 5) 사회 대사 효율 (Productivity / Energy Utilization)
+  const productivityBaseText =
+    "에너지 대사 효율은 자원을 얼마나 손실 없이 기능·회복에 배분하는가를 나타내는 핵심 지표입니다";
+  let productivityGradeText;
+  switch ((productivityGrade || "").charAt(0)) {
+    case "A":
+      productivityGradeText =
+        "현재 지표는 A 등급으로, 상대적으로 적은 자원으로도 높은 기능 수준을 유지할 수 있는 상태입니다. 사회적으로는 ‘고효율 인력’으로 분류됩니다.";
+      break;
+    case "C":
+      productivityGradeText =
+        "현재 지표는 C 등급으로, 에너지를 확보하고 활용하는 과정에서 손실이 많이 발생해 일상 활동만으로도 피로가 쉽게 누적될 수 있는 상태입니다.";
+      break;
+    default:
+      productivityGradeText =
+        "현재 지표는 B 등급으로, 기본적인 기능 수행에는 문제가 없지만 장시간 고부하 환경에서는 효율이 빠르게 떨어질 수 있는 중간 영역에 해당합니다.";
+      break;
+  }
+  const productivityText = `${productivityBaseText} ${productivityGradeText}`;
 
   // === 포커스용 점수 묶음 ===
   const scores = {
@@ -1647,7 +1721,6 @@ function renderAnalysisResult() {
     { key: "conformity", grade: conformityGrade, score: conformityScore },
   ];
 
-  // 1순위: C 등급(문제 큰 지표), 2순위: B 중에서 가장 극단적인 값
   let focusMetric =
     metricList.find((m) => m.grade === "C") ||
     metricList
@@ -1655,7 +1728,13 @@ function renderAnalysisResult() {
       .sort((a, b) => a.score - b.score)[0] ||
     metricList[0];
 
-  updateGutFocusOverlay(focusMetric.key, profile, scores, textsForFocus);
+  updateGutFocusOverlay(
+    focusMetric.key,
+    profile,
+    scores,
+    textsForFocus,
+    focusMetric.grade
+  );
 
   // === 상단 메타 ===
   const statusText =
@@ -1710,7 +1789,6 @@ function renderAnalysisResult() {
     `;
   }
 
-  // === 오른쪽: 6개 박스 (레이더 1 + 카드 5) ===
   resultListEl.style.display = "block";
   resultListEl.innerHTML = `
 <div class="gut-layout-right-inner"
@@ -1737,62 +1815,67 @@ function renderAnalysisResult() {
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     grid-auto-rows:minmax(0,1fr);
-    row-gap:8px;        /* 🔽 세로 간격 줄이기 */
+    row-gap:8px;
     column-gap:12px;
     min-height:0;
   ">
 
-        <!-- 0. 레이더 카드 : CSS로 스타일 제어 -->
+    <!-- 0. 레이더 카드 -->
     <div class="gut-radar-card">
       <div class="gut-radar-header">
         <div class="gut-radar-title">장내 사회 지표 레이더</div>
-        <div class="gut-radar-legend">
-        </div>
+        <div class="gut-radar-legend"></div>
       </div>
-
       <div class="gut-radar-canvas-wrap">
         <canvas id="gutRadar"></canvas>
       </div>
     </div>
 
-    <!-- 공통 카드 스타일 변수처럼 쓸 부분들 -->
     ${(() => {
       const cardBase = `
   background:#FAF2E5;
   opacity:0.78;
   border-radius:16px;
-  padding:14px 18px 16px 18px;   /* ⬆ 카드 안쪽 여백 넉넉하게 */
+  padding:14px 18px 16px 18px;
   box-shadow:0 8px 20px rgba(15,23,42,0.06);
   display:flex;
   flex-direction:column;
-  gap:8px;                      /* 제목–본문 사이도 살짝 띄우기 */
+  gap:8px;
 `;
-      const titleRow = (label, grade, icon) => `
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-    <div style="display:flex; align-items:center; gap:10px;">
-      <img src="assets/img/${icon}.svg" style="width:32px;height:32px;" />
-      <span style="font-size:15px; font-weight:800; color:#111827;">
-        ${label}
+
+      // 등급 한 글자(A/B/C) 미리 뽑기
+      const divGrade = (diversityGrade || "").charAt(0);
+      const confGrade = (conformityGrade || "").charAt(0);
+      const cohGrade = (cohesionGrade || "").charAt(0);
+      const inflamGrade = (conflictGrade || "").charAt(0);
+      const prodGrade = (productivityGrade || "").charAt(0);
+
+      const titleRow = (label, shortGrade, icon) => `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img src="assets/img/${icon}.svg" style="width:32px;height:32px;" />
+        <span style="font-size:15px; font-weight:800; color:#111827;">
+          ${label}
+        </span>
+      </div>
+      <span class="gut-card-grade gut-card-grade-${shortGrade}">
+        ${shortGrade}
       </span>
     </div>
-    <span style="
-      font-size:13px;
-      font-weight:900;
-      padding:4px 10px;
-      border-radius:999px;
-      background:#eef2ff;
-      color:#4f46e5;
-    ">${grade}</span>
-  </div>
-`;
+  `;
 
       return `
       <!-- 1. 정상성 스펙트럼 -->
       <div style="${cardBase}">
-        ${titleRow("정상성 스펙트럼", diversityGrade, "Gut_1")}
-        <div style="font-size:13px; color:#6b7280;">
+        ${titleRow("정상성 스펙트럼", divGrade, diversityIcon)}
+        <div class="gut-card-metric gut-card-metric-${divGrade}">
           다양성 = ${profile.D.toFixed(2)} · ${pct(diversityScore)}
         </div>
+
+        <div class="gut-metric-bar">
+          <canvas id="gutMetric_diversity"></canvas>
+        </div>
+
         <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
           ${diversityText}
         </p>
@@ -1800,12 +1883,16 @@ function renderAnalysisResult() {
 
       <!-- 2. 규범 순응도 -->
       <div style="${cardBase}">
-        ${titleRow("규범 순응도", conformityGrade, "Gut_2")}
-        <div style="font-size:13px; color:#6b7280;">
+        ${titleRow("규범 순응도", confGrade, conformityIcon)}
+        <div class="gut-card-metric gut-card-metric-${confGrade}">
           B = ${profile.B.toFixed(2)}, P = ${profile.P.toFixed(2)} · ${pct(
         conformityScore
       )}
         </div>
+        <div class="gut-metric-bar">
+          <canvas id="gutMetric_conformity"></canvas>
+        </div>
+
         <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
           ${conformityText}
         </p>
@@ -1813,10 +1900,15 @@ function renderAnalysisResult() {
 
       <!-- 3. 공동체 유지 에너지 -->
       <div style="${cardBase}">
-        ${titleRow("공동체 유지 에너지", cohesionGrade, "Gut_3")}
-        <div style="font-size:12px; color:#6b7280;">
+        ${titleRow("공동체 유지 에너지", cohGrade, cohesionIcon)}
+        <div class="gut-card-metric gut-card-metric-${cohGrade}">
           SCFA = ${profile.Bt.toFixed(1)} · ${pct(cohesionScore)}
         </div>
+
+        <div class="gut-metric-bar">
+          <canvas id="gutMetric_cohesion"></canvas>
+        </div>
+
         <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
           ${cohesionText}
         </p>
@@ -1824,12 +1916,17 @@ function renderAnalysisResult() {
 
       <!-- 4. 사회 염증 지수 -->
       <div style="${cardBase}">
-        ${titleRow("사회 염증 지수", conflictGrade, "Gut_4")}
-        <div style="font-size:13px; color:#6b7280;">
+        ${titleRow("사회 염증 지수", inflamGrade, conflictIcon)}
+        <div class="gut-card-metric gut-card-metric-${inflamGrade}">
           L = ${profile.L.toFixed(2)}, C = ${profile.C.toFixed(1)} · ${pct(
         conflictScore
       )}
         </div>
+
+        <div class="gut-metric-bar">
+          <canvas id="gutMetric_conflict"></canvas>
+        </div>
+
         <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
           ${conflictText}
         </p>
@@ -1837,20 +1934,25 @@ function renderAnalysisResult() {
 
       <!-- 5. 사회 대사 효율 -->
       <div style="${cardBase}">
-        ${titleRow("사회 대사 효율", productivityGrade, "Gut_5")}
-        <div style="font-size:13px; color:#6b7280;">
+        ${titleRow("사회 대사 효율", prodGrade, productivityIcon)}
+        <div class="gut-card-metric gut-card-metric-${prodGrade}">
           EEE = ${profile.EEE.toFixed(2)} · ${pct(productivityScore)}
         </div>
+
+        <div class="gut-metric-bar">
+          <canvas id="gutMetric_productivity"></canvas>
+        </div>
+
         <p style="font-size:13px; color:#4b5563; margin:0; line-height:1.4;">
           ${productivityText}
         </p>
       </div>`;
     })()}
+
   </div>
 </div>
 `;
 
-  // 🔹 레이더 그리기 (각 지표 등급 전달)
   setTimeout(() => {
     drawGutRadar({
       labels: [
@@ -1868,18 +1970,29 @@ function renderAnalysisResult() {
         productivityScore,
       ],
       grades: [
-        diversityGrade, // 정상성 스펙트럼
-        conformityGrade, // 규범 순응도
-        cohesionGrade, // 공동체 유지
-        conflictGrade, // 사회 염증
-        productivityGrade, // 대사 효율
+        diversityGrade,
+        conformityGrade,
+        cohesionGrade,
+        conflictGrade,
+        productivityGrade,
       ],
     });
+
+    // 🔹 각 카드 안 미니 바 차트
+    drawGutMiniBar("gutMetric_diversity", diversityScore, diversityGrade);
+    drawGutMiniBar("gutMetric_conformity", conformityScore, conformityGrade);
+    drawGutMiniBar("gutMetric_cohesion", cohesionScore, cohesionGrade);
+    drawGutMiniBar("gutMetric_conflict", conflictScore, conflictGrade);
+    drawGutMiniBar(
+      "gutMetric_productivity",
+      productivityScore,
+      productivityGrade
+    );
   }, 0);
 }
 
 // 🔍 결과 페이지: 가장 눈여겨볼 지표를 장 위에 표시
-function updateGutFocusOverlay(focusKey, profile, scores, texts) {
+function updateGutFocusOverlay(focusKey, profile, scores, texts, rawGrade) {
   if (!gutFocusOverlayEl) return;
 
   // 지표별로 장 위에서 어느 위치를 찍을지 (대략 값, 필요하면 나중에 수정)
@@ -1887,7 +2000,7 @@ function updateGutFocusOverlay(focusKey, profile, scores, texts) {
     diversity: {
       // ✅ 점: 왼쪽 중간 / 카드: 왼쪽 아래
       label: "정상성 스펙트럼",
-      dotX: "14%",
+      dotX: "15%",
       dotY: "48%",
       cardX: "8%", // 그대로
       cardTop: "66%", // 살짝만 아래로
@@ -1912,7 +2025,7 @@ function updateGutFocusOverlay(focusKey, profile, scores, texts) {
       // ✅ 점: 오른쪽 위쪽 / 카드: 오른쪽 중앙
       label: "사회 염증 지수",
       dotX: "58%",
-      dotY: "40%",
+      dotY: "34%",
       cardX: "54%", // 살짝 왼쪽
       cardTop: "66%", // cohesion 카드랑 안 겹치게 조금 아래
     },
@@ -1978,7 +2091,31 @@ function updateGutFocusOverlay(focusKey, profile, scores, texts) {
   }
 
   if (gutFocusTitleEl) gutFocusTitleEl.textContent = cfg.label;
-  if (gutFocusSubEl) gutFocusSubEl.textContent = sub;
+
+  if (gutFocusSubEl) {
+    gutFocusSubEl.textContent = sub;
+
+    // 🔥 등급 → A/B/C 한 글자만 뽑기
+    const g = (rawGrade || "").charAt(0); // "A-", "B+" → "A", "B"
+
+    // 기존 등급 클래스 제거
+    gutFocusSubEl.classList.remove(
+      "gut-focus-sub-A",
+      "gut-focus-sub-B",
+      "gut-focus-sub-C"
+    );
+
+    // 새 등급 클래스 추가
+    if (g === "A") {
+      gutFocusSubEl.classList.add("gut-focus-sub-A");
+    } else if (g === "C") {
+      gutFocusSubEl.classList.add("gut-focus-sub-C");
+    } else {
+      // B 또는 그 외는 B로 처리
+      gutFocusSubEl.classList.add("gut-focus-sub-B");
+    }
+  }
+
   if (gutFocusBodyEl) gutFocusBodyEl.textContent = body;
 }
 
@@ -1995,7 +2132,7 @@ function drawGutRadar(data) {
 
   const cx = width / 2;
   const cy = height / 2 + 4; // 살짝 아래로
-  const radius = Math.min(width, height) * 0.36;
+  const radius = Math.min(width, height) * 0.33; // 살짝만 줄여서 여백 확보
 
   const labels = data.labels;
   const values = data.values.map((v) => Math.max(0, Math.min(1, v)));
@@ -2007,13 +2144,13 @@ function drawGutRadar(data) {
   ctx.translate(0.5, 0.5); // 비트맵 경계 보정
 
   // --------------------------
-  // 등급 → RGB 색 정의
+  // 등급 → 색 정의 (브랜드 색)
   // --------------------------
   const gradeHex = (g) => {
     const gg = (g || "B")[0];
-    if (gg === "A") return "#16a34a"; // 초록
-    if (gg === "C") return "#ef4444"; // 빨강
-    return "#eab308"; // 노랑(B 및 기타)
+    if (gg === "A") return "#0D7C64"; // 안정 (초록)
+    if (gg === "C") return "#80233B"; // 주의 (와인)
+    return "#FFAA2B"; // 경계 (노랑)
   };
 
   const hexToRgb = (hex) => {
@@ -2025,32 +2162,11 @@ function drawGutRadar(data) {
     };
   };
 
-  // 점 색(등급들)에서 평균색 뽑기 → 이걸 폴리곤 기본 톤으로 사용
-  let sumR = 0,
-    sumG = 0,
-    sumB = 0;
-  let colorCount = 0;
-
-  for (let i = 0; i < count; i++) {
-    const rgb = hexToRgb(gradeHex(grades[i]));
-    sumR += rgb.r;
-    sumG += rgb.g;
-    sumB += rgb.b;
-    colorCount++;
-  }
-
-  const avgR = colorCount ? sumR / colorCount : 210;
-  const avgG = colorCount ? sumG / colorCount : 180;
-  const avgB = colorCount ? sumB / colorCount : 140;
-
-  const rgba = (r, g, b, a) =>
-    `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
-
   // --------------------------
-  // 그리드 폴리곤 (축/가이드)
+  // 1) 그리드 폴리곤 (축/가이드)
   // --------------------------
   const levels = 4;
-  ctx.strokeStyle = "rgba(148,163,184,0.6)";
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
   ctx.lineWidth = 1;
 
   for (let l = 1; l <= levels; l++) {
@@ -2068,10 +2184,10 @@ function drawGutRadar(data) {
   }
 
   // --------------------------
-  // 축 라인 + 라벨
+  // 2) 축 라인 + 라벨
   // --------------------------
-  ctx.font = "11px Sweet, system-ui";
-  ctx.fillStyle = "rgba(148,163,184,0.95)";
+  ctx.font = "14px Sweet, system-ui";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
 
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
@@ -2106,65 +2222,171 @@ function drawGutRadar(data) {
   }
 
   // --------------------------
-  // 폴리곤용 그라데이션 (점색 평균 기반)
-  //  - 안쪽: 살짝 밝고 투명
-  //  - 바깥: 점색에 가까운 톤
+  // 3) 꼭짓점 좌표 + 색 준비
   // --------------------------
-  const polyGrad = ctx.createRadialGradient(
-    cx,
-    cy,
-    radius * 0.1,
-    cx,
-    cy,
-    radius
-  );
-  polyGrad.addColorStop(0, rgba(avgR + 15, avgG + 15, avgB + 15, 0.12));
-  polyGrad.addColorStop(1, rgba(avgR, avgG, avgB, 0.42));
-
-  // 폴리곤 라인 색도 평균색에서 조금 진하게
-  const polyStroke = rgba(avgR - 10, avgG - 10, avgB - 10, 0.9);
-
-  // --------------------------
-  // 데이터 폴리곤
-  // --------------------------
-  ctx.beginPath();
+  const points = [];
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
     const r = radius * values[i];
     const x = cx + Math.cos(angle) * r;
     const y = cy + Math.sin(angle) * r;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+
+    const hex = gradeHex(grades[i]);
+    const rgb = hexToRgb(hex);
+
+    points.push({ x, y, hex, rgb });
   }
-  ctx.closePath();
-
-  ctx.fillStyle = polyGrad;
-  ctx.strokeStyle = polyStroke;
-  ctx.lineWidth = 2;
-  ctx.fill();
-  ctx.stroke();
 
   // --------------------------
-  // 각 꼭짓점 점 (등급별 색) - 보더라인 없음
+  // 4) 면(폴리곤) 그라데이션
+  //    - 중심(cx,cy)과 인접 두 꼭짓점으로 삼각형 만들어서
+  //      edge 방향으로 A→B 그라데이션
   // --------------------------
+  ctx.globalAlpha = 0.7; // 면은 살짝 투명
   for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
-    const r = radius * values[i];
-    const x = cx + Math.cos(angle) * r;
-    const y = cy + Math.sin(angle) * r;
+    const p1 = points[i];
+    const p2 = points[(i + 1) % count];
 
-    const dotHex = gradeHex(grades[i]);
-    const dotRgb = hexToRgb(dotHex);
+    // 이 변 방향으로 선형 그라데이션
+    const grad = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+    grad.addColorStop(0, `rgba(${p1.rgb.r},${p1.rgb.g},${p1.rgb.b},0.35)`);
+    grad.addColorStop(1, `rgba(${p2.rgb.r},${p2.rgb.g},${p2.rgb.b},0.35)`);
 
     ctx.beginPath();
-    ctx.arc(x, y, 3.2, 0, Math.PI * 2);
-    // 점 내부는 살짝 투명하게
-    ctx.fillStyle = rgba(dotRgb.r, dotRgb.g, dotRgb.b, 0.95);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.closePath();
+    ctx.fillStyle = grad;
     ctx.fill();
-    // 🔥 보더라인 없음: stroke() 호출 안 함
+  }
+  ctx.globalAlpha = 1.0;
+
+  // --------------------------
+  // 5) 선(폴리곤 테두리) 그라데이션
+  //    - 각 변마다 A색 → B색 그라데이션
+  // --------------------------
+  ctx.lineWidth = 2;
+  for (let i = 0; i < count; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % count];
+
+    const gradLine = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+    gradLine.addColorStop(0, `rgba(${p1.rgb.r},${p1.rgb.g},${p1.rgb.b},0.95)`);
+    gradLine.addColorStop(1, `rgba(${p2.rgb.r},${p2.rgb.g},${p2.rgb.b},0.95)`);
+
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = gradLine;
+    ctx.stroke();
+  }
+
+  // --------------------------
+  // 6) 꼭짓점 점 (등급 색) - 보더 없음
+  // --------------------------
+  for (let i = 0; i < count; i++) {
+    const p = points[i];
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${p.rgb.r},${p.rgb.g},${p.rgb.b},1)`;
+    ctx.fill();
+    // ⚠️ stroke() 호출 안 함 → 보더 없음
   }
 
   ctx.restore();
+}
+
+function drawGutMiniBar(canvasId, value, grade) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !canvas.getContext) return;
+
+  const ctx = canvas.getContext("2d");
+
+  const width = canvas.clientWidth || 180;
+  const height = canvas.clientHeight || 16;
+  canvas.width = width;
+  canvas.height = height;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // 0~1로 클램프
+  const v = Math.max(0, Math.min(1, value || 0));
+  const avg = 0.5; // 🔹 공단 평균선 (중앙 고정)
+
+  // 등급별 색 (브랜드 팔레트)
+  let pointColor = "#FFAA2B"; // B 기본
+  const g = (grade || "").charAt(0);
+  if (g === "A") pointColor = "#0D7C64";
+  else if (g === "C") pointColor = "#80233B";
+
+  const trackY = height / 2;
+  const marginX = 6;
+  const trackStartX = marginX;
+  const trackEndX = width - marginX;
+  const trackW = trackEndX - trackStartX;
+
+  // 1) 전체 트랙 (얇은 선)
+  ctx.strokeStyle = "rgba(0,0,0,0.18)";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(trackStartX, trackY);
+  ctx.lineTo(trackEndX, trackY);
+  ctx.stroke();
+
+  // 2) 평균선 (공단 평균 기준선) - 회색 세로선
+  const avgX = trackStartX + trackW * avg;
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(avgX, trackY - 6);
+  ctx.lineTo(avgX, trackY + 6);
+  ctx.stroke();
+
+  // 3) 내 점 위치
+  const valX = trackStartX + trackW * v;
+
+  // 평균과 내 점 사이를 옅게 연결 (살짝만)
+  ctx.strokeStyle = pointColor + "55"; // 살짝 투명
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(avgX, trackY);
+  ctx.lineTo(valX, trackY);
+  ctx.stroke();
+
+  // 4) 내 점 ●
+  const rOuter = 5;
+  const rInner = 2.8;
+
+  // 바깥 테두리 (밝은 아이보리 테두리)
+  ctx.fillStyle = "#FAF2E5";
+  ctx.beginPath();
+  ctx.arc(valX, trackY, rOuter, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 안쪽 컬러 점
+  ctx.fillStyle = pointColor;
+  ctx.beginPath();
+  ctx.arc(valX, trackY, rInner, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// 공용 둥근 사각형 유틸
+function roundRect(ctx, x, y, w, h, r) {
+  const radius = Math.min(r, h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 // -----------------------------

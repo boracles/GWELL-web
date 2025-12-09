@@ -606,6 +606,25 @@ body {
   font-size: 16px;
 }
 
+.scan-result-list .gut-radar-card {
+  padding-top: 26px;
+  padding-bottom: 26px;
+}
+
+/* 지표 카드 5개 – 이미 background:#FAF2E5로 잡고 있으니 여기만 늘림 */
+.scan-result-list div[style*="background:#FAF2E5"] {
+  padding-top: 22px !important;
+  padding-bottom: 22px !important;
+}
+
+/* 결과지 오른쪽 6칸 그리드의 '칸 높이' 강제 설정 */
+.scan-result-list .gut-layout-right-inner > div:nth-child(2) {
+  /* 이미 display:grid 라고 인라인에 있지만 한 번 더 써줘도 상관 없음 */
+  grid-auto-rows: 264px !important; /* 🔥 칸 높이: 260px. 숫자만 네 눈에 맞게 조절 */
+  row-gap: 16px; /* 세로 간격 조금 넓게 */
+  column-gap: 16px;
+}
+
 /* 1) 제일 위 제목: “장내 생태 기반 사회 적응도 분석 보고서” */
 .scan-result-list .gut-layout-right-inner > div:first-child span:last-child {
   font-size: 18px !important; /* ← 여기 숫자 바꾸면 됨 */
@@ -615,14 +634,42 @@ body {
 
 /* 2) 카드 안 제목 (아이콘 오른쪽 굵은 글자: ‘정상성 스펙트럼’ 등) */
 .scan-result-list .gut-layout-right-inner img + span {
-  font-size: 18px !important; /* ← 카드 제목 크기 */
+  font-size: 22px !important; /* ← 카드 제목 크기 */
   font-weight: 800 !important;
+  margin-left: 6px;
 }
 
-/* 3) 카드 안 수치 줄 (D = …, B = …, SCFA = … 같은 회색 작은 글자) */
-.scan-result-list .gut-layout-right-inner div[style*="color:#6b7280"] {
-  font-size: 16px !important; /* ← 수치 라인 크기 */
+.scan-result-list .gut-radar-title {
+  font-size: 22px !important; /* 원하는 숫자 */
+  font-weight: 900 !important;
+  margin-left: 7px;
+}
+
+/* 수치 라인 공통 스타일 */
+.gut-card-metric {
+  font-size: 16px;
   font-weight: 600;
+}
+
+/* 등급별 색 */
+.gut-card-metric-A {
+  color: #0d7c64 !important; /* 안정 A */
+}
+
+.gut-card-metric-B {
+  color: #ffaa2b !important; /* 경계 B */
+}
+
+.gut-card-metric-C {
+  color: #80233b !important; /* 주의 C */
+}
+
+/* 4) 카드 본문 설명 문장 */
+.scan-result-list .gut-layout-right-inner p {
+  font-size: 16px !important; /* 본문 크기 유지 */
+  line-height: 1.6;
+  color: #000000 !important; /* 🔥 본문 글자색: 완전 검정 */
+  font-weight: 600; /* 🔥 두께 더 키우기 (SemiBold 느낌) */
 }
 
 /* ==========================
@@ -692,15 +739,35 @@ body {
   pointer-events: none;
 }
 
+/* =========================================
+   C2: 5개 지표 카드 외곽 라인을 포커스 카드처럼 또렷하게
+   (레이더 카드 .gut-radar-card 는 그대로)
+========================================= */
+
 .gut-card {
-  background: #faf2e5;
-  opacity: 0.78;
-  border-radius: 16px;
-  padding: 14px 18px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  position: relative;
+  /* 유리 재질은 유지 */
+  background: rgba(242, 230, 221, 0.52);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  /* 실제 border는 없애고 (::before에서 다시 그림) */
+  border: none !important;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.55);
+}
+
+/* 진짜 테두리는 여기서 그림 */
+.gut-card::before {
+  content: "";
+  position: absolute;
+  inset: 0; /* 카드 전체를 감싸는 라인 */
+  border-radius: inherit;
+  border: 2px solid #f2e6dd; /* 포커스 카드와 동일한 완전 불투명 라인 */
+  pointer-events: none; /* 클릭 막지 않도록 */
+}
+
+/* 카드 내부 텍스트 색도 포커스 카드와 동일하게 */
+.gut-card * {
+  color: #3b205c !important;
 }
 
 .gut-card-header {
@@ -716,13 +783,47 @@ body {
   color: #111827;
 }
 
+/* 공통 A/B/C 등급 뱃지를 완전 동그라미로 */
 .gut-card-grade {
-  font-size: 13px;
-  font-weight: 900;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #4f46e5;
+  /* 기존 값들 덮어쓰기 */
+  width: 42px; /* 정사각형 */
+  height: 42px;
+  min-width: 40px; /* pill 안 되게 */
+  padding: 0; /* 안쪽 여백 제거 */
+
+  border-radius: 50%; /* 완전 원 모양 */
+
+  display: flex; /* 중앙 정렬 */
+  align-items: center;
+  justify-content: center;
+
+  font-size: 18px; /* A/B/C 글자 크기 */
+  font-weight: 1000;
+  line-height: 1;
+  font-family: "Sweet", system-ui, sans-serif;
+
+  border: 2px solid transparent; /* 색은 A/B/C 클래스에서 */
+}
+
+/* A 등급 – 초록 */
+.gut-card-grade-A {
+  background: rgba(13, 124, 100, 0.2);
+  color: #0d7c64;
+  border-color: rgba(13, 124, 100, 0.7);
+}
+
+/* B 등급 – 노랑 */
+.gut-card-grade-B {
+  background: rgba(255, 170, 43, 0.2);
+  color: #ffaa2b;
+  border-color: rgba(255, 170, 43, 0.7);
+}
+
+/* C 등급 – 빨강 */
+.gut-card-grade-C {
+  background: rgba(128, 35, 59, 0.2);
+  color: #80233b;
+  border-color: rgba(128, 35, 59, 0.7);
 }
 
 .gut-card-metric {
@@ -737,7 +838,7 @@ body {
 }
 
 .gut-radar-title {
-  font-size: 14px; /* ← 크기 조절 */
+  font-size: 20px; /* ← 크기 조절 */
   font-weight: 700;
   color: #111827;
 }
@@ -768,8 +869,8 @@ body {
   top: var(--gut-focus-card-top, 70%);
   min-width: 260px;
   max-width: 360px;
-  padding: 16px 18px 18px;
-  border-radius: 20px;
+  padding: 16px 19px 19px;
+  border-radius: 12px;
 
   /* 🔥 외곽선만 불투명 F2E6DD */
   border: 2px solid #f2e6dd;
@@ -788,7 +889,7 @@ body {
   font-size: 18px;
   font-weight: 800;
   margin-bottom: 2px;
-  color: #3b205c; /* 진한 보라 */
+  color: #000000; /* 진한 보라 */
 }
 
 .gut-focus-sub {
@@ -797,6 +898,19 @@ body {
   font-weight: 600;
   opacity: 1;
   color: #6d361a; /* 브라운 톤 */
+}
+
+/* 포커스 카드 수치 줄 – 등급별 색상 */
+.gut-focus-sub-A {
+  color: #0d7c64 !important; /* 안정 A – 초록 */
+}
+
+.gut-focus-sub-B {
+  color: #ffaa2b !important; /* 경계 B – 노랑 */
+}
+
+.gut-focus-sub-C {
+  color: #80233b !important; /* 주의 C – 와인 */
 }
 
 .gut-focus-body {
@@ -1040,7 +1154,7 @@ body.result-mode .scan-global-footer {
   );
 }
 .scan-bg.spiral {
-  background: radial-gradient(circle at center, #a855f7 0, transparent 50%);
+  background: radial-gradient(circle at center, #3b205c 0, transparent 50%);
 }
 
 .scan-bg.noise {
@@ -2515,6 +2629,16 @@ body.result-mode #scanRoot {
   ); /* JS에서 내려준 색 없으면 기본 초록 */
 }
 
+.gut-metric-bar {
+  margin-top: 6px;
+}
+
+.gut-metric-bar canvas {
+  width: 100%;
+  height: 12px;
+  display: block;
+}
+
 /* ===== 현재 상단 티커 ID 강조 행 ===== */
 .comparison-table tbody tr.is-main-asset {
   position: relative;
@@ -2568,4 +2692,41 @@ body.result-mode #scanRoot {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* =========================================
+   C2: 5개 지표 카드 → 포커스 카드랑 같은 글라스 + 불투명 라인
+   (레이더 카드, 포커스 카드에는 영향 없음)
+========================================= */
+
+/* 5개 지표 카드: background:#FAF2E5 가 들어간 카드만 선택 */
+.scan-result-list div[style*="background:#FAF2E5"] {
+  position: relative;
+
+  /* 포커스 카드와 동일한 유리 배경 */
+  background: rgba(242, 230, 221, 0.52) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+
+  /* 실제 border는 없애고 (::before에서 또렷하게 그림) */
+  border: none !important;
+
+  /* 포커스 카드와 비슷한 그림자 */
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.55);
+}
+
+/* 외곽 라인만 또렷하게 */
+.scan-result-list div[style*="background:#FAF2E5"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px; /* 모서리 살짝 더 둥글게 하고 싶으면 숫자 조절 */
+  border: 2px solid #f2e6dd; /* 포커스 카드와 같은 완전 불투명 라인 */
+  pointer-events: none;
+}
+
+/* 결과지 5개 카드 아이콘 크게 */
+.scan-result-list .gut-layout-right-inner img[src*="Gut_"] {
+  width: 48px !important; /* ← 원하는 크기 */
+  height: 48px !important; /* ← 원하는 크기 */
 }
