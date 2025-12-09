@@ -64,6 +64,75 @@ const standbyVoice = document.getElementById("standbyVoice");
 
 const pushVoice = document.getElementById("pushVoice");
 
+const warningAudio = document.getElementById("warningAudio");
+
+const listingCompleteAudio = document.getElementById("listingCompleteAudio");
+
+const scanLoopAudio = document.getElementById("scanLoopAudio");
+const detectVoice = document.getElementById("detectVoice");
+const pushDownVoice = document.getElementById("pushDownVoice");
+
+function playPushDownVoice() {
+  if (!pushDownVoice) return;
+  pushDownVoice.currentTime = 0;
+  pushDownVoice.volume = 0.9; // 필요하면 0~1
+  const p = pushDownVoice.play();
+  if (p && p.catch) {
+    p.catch((err) => console.log("pushDownVoice blocked:", err));
+  }
+}
+
+function playDetectVoice() {
+  if (!detectVoice) return;
+  detectVoice.currentTime = 0;
+  detectVoice.volume = 0.9; // 필요하면 0~1 사이로 조절
+  const p = detectVoice.play();
+  if (p && p.catch) {
+    p.catch((err) => {
+      console.log("detectVoice play blocked:", err);
+    });
+  }
+}
+
+function playScanLoop() {
+  if (!scanLoopAudio) return;
+  scanLoopAudio.loop = true;
+  scanLoopAudio.volume = 0.6; // 필요하면 조절
+  const p = scanLoopAudio.play();
+  if (p && p.catch) {
+    p.catch((err) => console.log("scanLoop play blocked:", err));
+  }
+}
+
+function stopScanLoop() {
+  if (!scanLoopAudio) return;
+  scanLoopAudio.pause();
+  scanLoopAudio.currentTime = 0;
+}
+
+function playWarningSound() {
+  if (!warningAudio) return;
+  warningAudio.currentTime = 0;
+  warningAudio.volume = 0.9; // 필요하면 0~1에서 조절
+  const p = warningAudio.play();
+  if (p && p.catch) {
+    p.catch((err) => {
+      console.log("warning audio play blocked:", err);
+    });
+  }
+}
+
+function playListingCompleteSound() {
+  if (!listingCompleteAudio) return;
+  try {
+    listingCompleteAudio.currentTime = 0;
+    listingCompleteAudio.volume = 0.9; // 필요하면 조절
+    listingCompleteAudio.play();
+  } catch (err) {
+    console.log("listingCompleteAudio error:", err);
+  }
+}
+
 function playPushVoice() {
   if (!pushVoice) return;
   pushVoice.currentTime = 0;
@@ -368,6 +437,7 @@ let particles = [];
 let standbyAnimReq = null;
 
 function showWarningPage(msg) {
+  playWarningSound();
   // 모든 UI 숨기기
   scanRootEl.style.display = "none";
   scanHeaderEl.style.display = "none";
@@ -840,6 +910,9 @@ function setPhase(phase) {
         if (idx === 1) {
           playPushVoice();
         }
+        if (idx === 3) {
+          playPushDownVoice();
+        }
 
         const t1 = setTimeout(() => {
           pumpSVG(idx);
@@ -878,6 +951,8 @@ function setPhase(phase) {
                     seqText.style.opacity = 0;
                     seqText.innerText =
                       "장내 배출 데이터가 감지되었습니다. 장내 데이터 정렬을 시작합니다.";
+                    // 🔊 감지 문장 나올 때 효과음 한 번 재생
+                    playDetectVoice();
                   }
 
                   // ✅ 이 타이밍에 3D 미생물 켜기
@@ -961,7 +1036,7 @@ function setPhase(phase) {
 
       microProgress = 0.25;
       showMicrobes(true);
-
+      playScanLoop();
       break;
 
     case "B1":
@@ -1008,6 +1083,7 @@ function setPhase(phase) {
       break;
 
     case "C2":
+      stopScanLoop();
       playResultSound();
 
       if (statusSystemEl) statusSystemEl.textContent = "RESULT";
@@ -1060,6 +1136,7 @@ function setPhase(phase) {
       break;
 
     case "C5":
+      playListingCompleteSound();
       if (statusSystemEl) statusSystemEl.textContent = "LISTED";
 
       // 🔹 중앙 전체 화면 텍스트 모드 켜기
@@ -1102,10 +1179,11 @@ function setPhase(phase) {
 
         updateSensorStatus();
         setPhase("A0-1");
-      }, 3500);
+      }, 4500);
       break;
 
     case "D1":
+      stopScanLoop();
       if (statusSystemEl) statusSystemEl.textContent = "INTERRUPTED";
       mainMessageEl.textContent = "착석이 해제되었습니다.";
       subMessageEl.textContent =
@@ -1116,6 +1194,7 @@ function setPhase(phase) {
       break;
 
     case "D2":
+      stopScanLoop();
       if (statusSystemEl) statusSystemEl.textContent = "INTERRUPTED";
       mainMessageEl.textContent = "충분한 데이터가 수집되지 않았습니다.";
       subMessageEl.textContent = "다시 앉아 안정된 자세로 진행해 주세요.";
