@@ -654,6 +654,25 @@ function showWarningPage(msg) {
   warningPageEl.style.display = "flex";
 }
 
+// 🔥 빠져있던 함수: 경고 페이지 닫기 + 뒤에 있던 화면 복구
+function hideWarningPage() {
+  if (!warningPageEl) return;
+  warningPageEl.style.display = "none";
+
+  // 현재 phase 기준으로 기본 UI만 살려주면 됨
+  const isStandby = currentPhase === "A0-1" || currentPhase === "A0-2";
+
+  if (isStandby) {
+    if (standbyScreenEl) standbyScreenEl.style.display = "block";
+    if (scanHeaderEl) scanHeaderEl.style.display = "none";
+    if (scanRootEl) scanRootEl.style.display = "none";
+  } else {
+    if (standbyScreenEl) standbyScreenEl.style.display = "none";
+    if (scanHeaderEl) scanHeaderEl.style.display = "flex";
+    if (scanRootEl) scanRootEl.style.display = "flex";
+  }
+}
+
 function initStandbyParticles() {
   if (!standbyCanvas || !standbyCtx) return;
   resizeStandbyCanvas();
@@ -3100,7 +3119,6 @@ function onPressureChange(on) {
     if (currentPhase === "A0-1" || currentPhase === "A0-2") {
       lastSitTime = Date.now();
 
-      // handleStandbyTap()이 하던 행동을 그대로 여기서 수행
       setPhase("POSTURE");
       scanTimer = 0;
       purity = 0;
@@ -3116,12 +3134,29 @@ function onPressureChange(on) {
 
   // 🔻 여기부터는 착석 해제(on === false)
 
-  // 🔻 C2(리절트 화면)에서 일어나면 = 상장 OK
+  // ✅ 1) POSTURE 단계에서 일어나면: 바로 1차 경고 페이지
+  if (currentPhase === "POSTURE") {
+    // POSTURE용 타이머/애니메이션 정리
+    postureTimers.forEach(clearTimeout);
+    postureTimers = [];
+    if (postureProgressInner) {
+      postureProgressInner.style.width = "0%";
+    }
+
+    leaveStartTime = Date.now(); // 이후 10초 지나면 mainLoopTick에서 2차 경고 + 리셋
+    warnedOnce = true; // 1차 경고는 이미 띄웠으니 mainLoopTick에서 또 안 띄우도록
+
+    showWarningPage("착석이 해제되었습니다.\n다시 앉으시면 이어서 진행됩니다.");
+    return;
+  }
+
+  // ✅ 2) C2(리절트 화면)에서 일어나면 = 상장 OK
   if (currentPhase === "C2") {
     commitListingFromScan(); // Supabase insert + C3 → C5
     return;
   }
 
+  // ✅ 3) 실제 스캔 단계(A1-2, B1~C1)에서 일어났을 때만
   const isScanPhase =
     currentPhase === "A1-2" ||
     currentPhase === "B1" ||
