@@ -639,6 +639,11 @@ let standbyAnimReq = null;
 
 function showWarningPage(msg) {
   playWarningSound();
+
+  // 🔥 스캔 음악 / 3D 미생물 정지
+  stopScanLoop();
+  showMicrobes(false);
+
   // 모든 UI 숨기기
   scanRootEl.style.display = "none";
   scanHeaderEl.style.display = "none";
@@ -647,12 +652,6 @@ function showWarningPage(msg) {
   // 경고 페이지 표시
   warningTextEl.textContent = msg;
   warningPageEl.style.display = "flex";
-}
-
-function hideWarningPage() {
-  warningPageEl.style.display = "none";
-  scanRootEl.style.display = "flex";
-  scanHeaderEl.style.display = "flex";
 }
 
 function initStandbyParticles() {
@@ -3063,8 +3062,7 @@ function onPressureChange(on) {
   updateSensorStatus();
 
   if (on) {
-    // ✅ 스캔 중에 잠깐 일어났다가 "다시 앉은" 상황이면
-    //    (경고 화면에서 복귀) → 리셋하지 말고 그대로 이어서 진행
+    // ✅ 스캔 중에 잠깐 일어났다가 "다시 앉은" 상황이면: 경고 닫고 음악 재개
     if (leaveStartTime) {
       leaveStartTime = null;
       warnedOnce = false;
@@ -3073,11 +3071,22 @@ function onPressureChange(on) {
         hideWarningPage();
       }
 
-      // currentPhase, scanTimer, purity 그대로 유지
+      // 스캔 단계였다면 스캔 음악 다시 켜기
+      const isScanPhaseResume =
+        currentPhase === "A1-2" ||
+        currentPhase === "B1" ||
+        currentPhase === "B2" ||
+        currentPhase === "B3" ||
+        currentPhase === "C1";
+
+      if (isScanPhaseResume) {
+        playScanLoop();
+      }
+
       return;
     }
 
-    // ✅ 결과 페이지에서 다시 앉으면 아무 일도 안 함
+    // ✅ 결과 페이지(C2~C5)에서 다시 앉으면 아무 일도 안 함
     if (
       currentPhase === "C2" ||
       currentPhase === "C3" ||
@@ -3087,12 +3096,21 @@ function onPressureChange(on) {
       return;
     }
 
-    // ✅ 그 외(처음 착석 등)는 기존처럼 스캔 시작
-    lastSitTime = Date.now();
-    setPhase("A1-2");
-    scanTimer = 0;
-    purity = 0;
-    updateProgress();
+    // ✅ 대기 상태(A0-1 / A0-2)에서 처음 앉았을 때 → POSTURE 화면으로만 이동
+    if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+      lastSitTime = Date.now();
+
+      // handleStandbyTap()이 하던 행동을 그대로 여기서 수행
+      setPhase("POSTURE");
+      scanTimer = 0;
+      purity = 0;
+      scanOverallTimer = 0;
+      updateProgress();
+
+      return;
+    }
+
+    // 그 외의 phase(이미 POSTURE / 스캔 중 등)는 착석 신호를 무시
     return;
   }
 
@@ -3104,7 +3122,6 @@ function onPressureChange(on) {
     return;
   }
 
-  // 🔻 그 밖의 Phase에서 일어나면 = 상장 X, 그냥 이탈 타이머만
   const isScanPhase =
     currentPhase === "A1-2" ||
     currentPhase === "B1" ||
