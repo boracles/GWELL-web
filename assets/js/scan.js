@@ -72,6 +72,206 @@ const scanLoopAudio = document.getElementById("scanLoopAudio");
 const detectVoice = document.getElementById("detectVoice");
 const pushDownVoice = document.getElementById("pushDownVoice");
 
+// ==========================
+// Web Serial + Web Audio (LED)
+// ==========================
+let ledSerialPort = null;
+let ledSerialWriter = null;
+const ledTextEncoder = new TextEncoder();
+
+let audioCtx = null;
+let audioAnalyser = null;
+let audioDataArray = null;
+let audioLedRunning = false;
+
+// 한 번 만든 source 재사용하기 위한 캐시
+const audioSourceMap = new Map();
+
+// 🔥 시리얼 읽기용
+let ledSerialReader = null;
+const ledTextDecoder = new TextDecoder();
+let serialReadBuffer = "";
+
+// 압력 센서 두 개 상태
+let pressureAOn = false;
+let pressureBOn = false;
+
+// 🔥 아두이노에서 온 한 줄 처리
+function handleSerialLineFromArduino(line) {
+  if (!line) return;
+
+  // 콘솔에서 확인하고 싶으면 열어둠
+  // console.log("ARDUINO:", line);
+
+  if (line === "P1A") {
+    pressureAOn = true;
+  } else if (line === "P0A") {
+    pressureAOn = false;
+  } else if (line === "P1B") {
+    pressureBOn = true;
+  } else if (line === "P0B") {
+    pressureBOn = false;
+  } else {
+    // LED 밝기용 "B123" 같은 건 아두이노 쪽에서 이미 처리하니까 여기서는 무시
+    return;
+  }
+
+  // 두 센서 중 하나라도 눌려 있으면 착석으로 간주
+  const seatNow = pressureAOn || pressureBOn;
+
+  // JS 전역 pressureOn과 다를 때만 이벤트 발생
+  if (seatNow !== pressureOn) {
+    onPressureChange(seatNow);
+  }
+}
+
+async function startSerialReadLoop() {
+  if (!ledSerialPort || !ledSerialPort.readable) return;
+
+  ledSerialReader = ledSerialPort.readable.getReader();
+  try {
+    while (true) {
+      const { value, done } = await ledSerialReader.read();
+      if (done) break;
+      if (!value) continue;
+
+      // value는 Uint8Array → 문자열로 디코드
+      const chunk = ledTextDecoder.decode(value);
+      serialReadBuffer += chunk;
+
+      // 줄 단위(\n)로 끊어서 처리
+      let idx;
+      while ((idx = serialReadBuffer.indexOf("\n")) >= 0) {
+        const line = serialReadBuffer.slice(0, idx).trim();
+        serialReadBuffer = serialReadBuffer.slice(idx + 1);
+        if (line) {
+          handleSerialLineFromArduino(line);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("serial read error:", err);
+  } finally {
+    if (ledSerialReader) {
+      ledSerialReader.releaseLock();
+      ledSerialReader = null;
+    }
+  }
+}
+
+// 브라우저에서 아두이노 시리얼 연결
+async function connectLedSerial() {
+  if (!("serial" in navigator)) {
+    alert(
+      "이 브라우저는 Web Serial을 지원하지 않습니다. Chrome을 사용해 주세요."
+    );
+    return;
+  }
+
+  try {
+    // 1) 포트 선택
+    ledSerialPort = await navigator.serial.requestPort();
+    await ledSerialPort.open({ baudRate: 115200 });
+
+    const writable = ledSerialPort.writable;
+    if (!writable) {
+      console.error("시리얼 포트가 writable이 아닙니다.");
+      return;
+    }
+
+    ledSerialWriter = writable.getWriter();
+    console.log("✅ LED 시리얼 연결 완료");
+
+    // 🔥 아두이노 → JS 시그널 읽기 시작 (압력 센서용)
+    startSerialReadLoop();
+
+    // 2) 오디오 분석 준비 + 루프 시작
+    await setupAudioReactiveLed();
+  } catch (err) {
+    console.error("connectLedSerial error:", err);
+  }
+}
+
+// 오디오 → 밝기 분석 세팅
+async function setupAudioReactiveLed() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  if (!audioAnalyser) {
+    audioAnalyser = audioCtx.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    const bufferLength = audioAnalyser.frequencyBinCount;
+    audioDataArray = new Uint8Array(bufferLength);
+  }
+
+  // ambient / scanLoop / result 오디오를 analyser에 연결
+  const targets = [ambientAudio, scanLoopAudio, resultAudio];
+  targets.forEach((el) => {
+    if (!el) return;
+    if (audioSourceMap.has(el)) return; // 이미 연결됐으면 패스
+
+    const src = audioCtx.createMediaElementSource(el);
+    src.connect(audioAnalyser);
+    src.connect(audioCtx.destination); // 실제 스피커로도 나가게
+    audioSourceMap.set(el, src);
+  });
+
+  if (!audioLedRunning) {
+    audioLedRunning = true;
+    audioLedLoop();
+  }
+}
+
+// 밝기 값을 아두이노로 전송 ("B123\n" 형식)
+function sendLedBrightness(brightness) {
+  if (!ledSerialWriter) return;
+
+  const clamped = Math.max(0, Math.min(255, Math.round(brightness)));
+  const msg = `B${clamped}\n`;
+
+  ledSerialWriter
+    .write(ledTextEncoder.encode(msg))
+    .catch((err) => console.error("serial write error:", err));
+}
+
+// 오디오 분석 루프 → 밝기 계산
+function audioLedLoop() {
+  if (!audioAnalyser || !audioDataArray || !audioLedRunning) return;
+
+  audioAnalyser.getByteFrequencyData(audioDataArray);
+
+  // 전체 주파수 대역의 평균값 사용
+  let sum = 0;
+  for (let i = 0; i < audioDataArray.length; i++) {
+    sum += audioDataArray[i];
+  }
+  const avg = sum / audioDataArray.length; // 0~255 근처
+
+  // 약하게 들릴 때도 좀 살아있게 커브 적용
+  const normalized = Math.min(1, avg / 140); // 140 기준
+  const curved = Math.pow(normalized, 1.5); // 감마 느낌
+
+  const minBright = 10; // 완전 꺼지지 않게
+  const maxBright = 255; // 최대 밝기
+  const brightness = minBright + (maxBright - minBright) * curved;
+
+  // 👉 스캔 페이즈에서만 강하게 반응, 그 외에는 은은하게
+  if (
+    currentPhase === "A1-2" ||
+    currentPhase === "B1" ||
+    currentPhase === "B2" ||
+    currentPhase === "B3" ||
+    currentPhase === "C1"
+  ) {
+    sendLedBrightness(brightness);
+  } else {
+    sendLedBrightness(40); // 대기/결과 화면은 고정 저밝기
+  }
+
+  requestAnimationFrame(audioLedLoop);
+}
+
 function playPushDownVoice() {
   if (!pushDownVoice) return;
   pushDownVoice.currentTime = 0;
@@ -235,6 +435,7 @@ let postureTimers = [];
 let analysisResult = null;
 
 let testTriggered = false;
+let ledConnectTried = false;
 
 // -----------------------------
 // Standby 셰이더 배경 (flowmap 없이 꿀렁)
@@ -2916,9 +3117,6 @@ function onPressureChange(on) {
   }
 }
 
-// -----------------------------
-// 버튼 바인딩
-// -----------------------------
 if (debugStartBtn) {
   debugStartBtn.addEventListener("click", () => {
     pirOn = false;
@@ -3036,6 +3234,14 @@ function handleStandbyTap() {
   // 진짜 대기 상태일 때만 동작
   if (currentPhase === "A0-1" || currentPhase === "A0-2") {
     testTriggered = true;
+
+    // 🔥 여기서 한 번만 Web Serial 연결 시도 (유저 탭 이벤트 안에서)
+    if (!ledConnectTried && "serial" in navigator) {
+      ledConnectTried = true;
+      connectLedSerial().catch((err) => {
+        console.error("LED connect error:", err);
+      });
+    }
 
     setPhase("POSTURE");
     scanTimer = 0;
