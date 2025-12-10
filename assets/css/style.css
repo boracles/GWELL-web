@@ -82,7 +82,18 @@ body {
   width: 100%;
   height: 100%;
   background: #000000;
-  overflow: hidden; /* 🔥 화면 스크롤 완전 차단 */
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#touchBlock {
+  position: fixed;
+  inset: 0;
+  z-index: 999999999; /* 어떤 요소보다도 위 */
+  background: transparent;
+  pointer-events: auto; /* 아래 터치 모두 차단 */
+  touch-action: none; /* 제스처 완전 차단 */
 }
 
 body {
