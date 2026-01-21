@@ -2926,11 +2926,13 @@ async function listCardToSupabase() {
 
   if (error) {
     console.error(error);
-    warningMessageEl.textContent =
-      "시스템 전송 중 오류가 발생했습니다. 직원에게 알려 주세요.";
-    warningMessageEl.style.display = "block";
+    if (warningMessageEl) {
+      warningMessageEl.textContent =
+        "시스템 전송 중 오류가 발생했습니다. 직원에게 알려 주세요.";
+      warningMessageEl.style.display = "block";
+    }
   }
-}
+
 
 // -----------------------------
 // 메인 루프 (1초 단위)
@@ -3227,21 +3229,10 @@ if (btnReset) {
 }
 
 if (btnYes) {
-  btnYes.addEventListener("click", async () => {
-    setPhase("C3");
-    await listCardToSupabase();
-    setTimeout(() => {
-      pirOn = false;
-      pressureOn = false;
-      scanTimer = 0;
-      purity = 0;
-      microProgress = 0;
-      scanResultStarted = false;
-      scanRunning = false;
-
-      updateSensorStatus();
-      setPhase("A0-1");
-    }, 3000);
+  btnYes.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await commitListingFromScan(); // C3 → 0.8s → C5 → 4.5s → A0-1
   });
 }
 
@@ -3355,36 +3346,36 @@ if (postureEl) {
 // 스캔 화면 / 결과 화면 터치 처리
 // -----------------------------
 if (scanRootEl) {
-  scanRootEl.addEventListener(
-    "click",
-    () => {
-      if (currentPhase === "C2") {
-        onPressureChange(false);
-        return;
-      }
+  scanRootEl.addEventListener("click", (e) => {
+    // 결과 화면(C2)에서: 클릭하면 상장
+    if (currentPhase === "C2") {
+      e.preventDefault();
+      e.stopPropagation();
+      commitListingFromScan();
+      return;
+    }
 
-      const isScanFastJumpPhase =
-        currentPhase === "A1-2" ||
-        currentPhase === "B1" ||
-        currentPhase === "B2" ||
-        currentPhase === "B3" ||
-        currentPhase === "C1";
+    // 스캔 중 테스트 점프만 유지
+    const isScanFastJumpPhase =
+      currentPhase === "A1-2" ||
+      currentPhase === "B1" ||
+      currentPhase === "B2" ||
+      currentPhase === "B3" ||
+      currentPhase === "C1";
 
-      if (!isScanFastJumpPhase) return;
-      if (scanResultStarted) return;
+    if (!isScanFastJumpPhase) return;
+    if (scanResultStarted) return;
 
-      const profile = createRandomGutProfile();
-      analysisResult = generateAnalysisFromGutProfile(profile);
+    const profile = createRandomGutProfile();
+    analysisResult = generateAnalysisFromGutProfile(profile);
 
-      scanOverallTimer = SCAN_OVERALL_TOTAL;
-      updateProgress();
+    scanOverallTimer = SCAN_OVERALL_TOTAL;
+    updateProgress();
 
-      setPhase("C2");
-      renderAnalysisResult();
-      showMicrobes(false);
-    },
-    true // ✅ capture
-  );
+    setPhase("C2");
+    renderAnalysisResult();
+    showMicrobes(false);
+  });
 }
 
 // ----------------------------------------------------
