@@ -2932,7 +2932,7 @@ async function listCardToSupabase() {
       warningMessageEl.style.display = "block";
     }
   }
-
+} // ✅ 이거 없으면 파일이 깨짐
 
 // -----------------------------
 // 메인 루프 (1초 단위)
@@ -3347,15 +3347,10 @@ if (postureEl) {
 // -----------------------------
 if (scanRootEl) {
   scanRootEl.addEventListener("click", (e) => {
-    // 결과 화면(C2)에서: 클릭하면 상장
-    if (currentPhase === "C2") {
-      e.preventDefault();
-      e.stopPropagation();
-      commitListingFromScan();
-      return;
-    }
+    // ✅ C2는 document capture가 처리하므로 여기서는 무시
+    if (currentPhase === "C2") return;
 
-    // 스캔 중 테스트 점프만 유지
+    // 스캔 중 테스트 점프만 유지 (기존 로직)
     const isScanFastJumpPhase =
       currentPhase === "A1-2" ||
       currentPhase === "B1" ||
@@ -3390,6 +3385,26 @@ if (warningPageEl) {
     onPressureChange(true);
   });
 }
+
+// ✅ C2 결과 화면: 화면 어디 클릭해도 상장(=C3→C5)
+let listingInProgress = false;
+
+document.addEventListener(
+  "click",
+  (e) => {
+    if (currentPhase !== "C2") return;
+    if (listingInProgress) return;
+
+    listingInProgress = true;
+    e.preventDefault();
+    e.stopPropagation();
+
+    commitListingFromScan().finally(() => {
+      setTimeout(() => (listingInProgress = false), 2000);
+    });
+  },
+  true // capture
+);
 
 // -----------------------------
 // 키보드 테스트 (Q/W로 예외 상황 시뮬레이션)
