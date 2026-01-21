@@ -3418,3 +3418,47 @@ window.addEventListener("keydown", (e) => {
     }, 2500);
   }
 });
+
+// -----------------------------
+// ⌨️ Spacebar = 클릭/착석 대체 입력
+// -----------------------------
+window.addEventListener("keydown", (e) => {
+  // Spacebar만 처리
+  if (e.code !== "Space") return;
+
+  // 스크롤 / 버튼 포커스 방지
+  e.preventDefault();
+
+  // 🔹 1) 대기 화면: 시작
+  if (currentPhase === "A0-1" || currentPhase === "A0-2") {
+    handleStandbyTap();
+    return;
+  }
+
+  // 🔹 2) POSTURE 화면: 바로 스캔 시작
+  if (currentPhase === "POSTURE") {
+    // POSTURE 화면 클릭 로직과 동일
+    postureTimers.forEach(clearTimeout);
+    postureTimers = [];
+
+    if (postureProgressInner) {
+      postureProgressInner.style.width = "0%";
+    }
+
+    scanTimer = 0;
+    scanOverallTimer = 0;
+    purity = 0;
+
+    setPhase("A1-2");
+    updateProgress();
+    return;
+  }
+
+  // 🔹 3) 결과 화면(C2): 상장 확정
+  if (currentPhase === "C2") {
+    commitListingFromScan();
+    return;
+  }
+
+  // 나머지 phase에서는 무시 (안전)
+});

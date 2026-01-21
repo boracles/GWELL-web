@@ -2952,3 +2952,7 @@ body.listing-complete #subMessage {
   margin-left: 4px; /* 🔥 글자와 수치 사이 간격 (2~6px 안에서 조정) */
   font-variant-numeric: tabular-nums;
 }
+
+#touchBlock {
+  pointer-events: none;
+}
