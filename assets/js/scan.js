@@ -3355,34 +3355,36 @@ if (postureEl) {
 // 스캔 화면 / 결과 화면 터치 처리
 // -----------------------------
 if (scanRootEl) {
-  scanRootEl.addEventListener("click", () => {
-    // ✅ 결과 화면(C2)에서 화면 클릭 = "일어섬"과 동일 처리
-    if (currentPhase === "C2") {
-      onPressureChange(false); // ← C2에서 일어섬이면 commitListingFromScan() 타게 되어있음
-      return;
-    }
+  scanRootEl.addEventListener(
+    "click",
+    () => {
+      if (currentPhase === "C2") {
+        onPressureChange(false);
+        return;
+      }
 
-    // 2) 그 외에는 기존처럼 "스캔 중일 때만" 결과로 점프 (테스트용)
-    const isScanFastJumpPhase =
-      currentPhase === "A1-2" ||
-      currentPhase === "B1" ||
-      currentPhase === "B2" ||
-      currentPhase === "B3" ||
-      currentPhase === "C1";
+      const isScanFastJumpPhase =
+        currentPhase === "A1-2" ||
+        currentPhase === "B1" ||
+        currentPhase === "B2" ||
+        currentPhase === "B3" ||
+        currentPhase === "C1";
 
-    if (!isScanFastJumpPhase) return;
-    if (scanResultStarted) return;
+      if (!isScanFastJumpPhase) return;
+      if (scanResultStarted) return;
 
-    const profile = createRandomGutProfile();
-    analysisResult = generateAnalysisFromGutProfile(profile);
+      const profile = createRandomGutProfile();
+      analysisResult = generateAnalysisFromGutProfile(profile);
 
-    scanOverallTimer = SCAN_OVERALL_TOTAL;
-    updateProgress();
+      scanOverallTimer = SCAN_OVERALL_TOTAL;
+      updateProgress();
 
-    setPhase("C2");
-    renderAnalysisResult();
-    showMicrobes(false);
-  });
+      setPhase("C2");
+      renderAnalysisResult();
+      showMicrobes(false);
+    },
+    true // ✅ capture
+  );
 }
 
 // ----------------------------------------------------
