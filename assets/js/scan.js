@@ -3271,25 +3271,21 @@ loopInterval = setInterval(mainLoopTick, 1000);
 // -----------------------------
 
 function handleStandbyTap() {
-  // 이미 한 번 넘어갔으면 무시
   if (testTriggered) return;
 
-  // 진짜 대기 상태일 때만 동작
   if (currentPhase === "A0-1" || currentPhase === "A0-2") {
     testTriggered = true;
 
-    // 🔥 여기서 한 번만 Web Serial 연결 시도 (유저 탭 이벤트 안에서)
+    // (선택) 시리얼 연결은 그대로
     if (!ledConnectTried && "serial" in navigator) {
       ledConnectTried = true;
-      connectLedSerial().catch((err) => {
-        console.error("LED connect error:", err);
-      });
+      connectLedSerial().catch((err) =>
+        console.error("LED connect error:", err)
+      );
     }
 
-    setPhase("POSTURE");
-    scanTimer = 0;
-    purity = 0;
-    updateProgress();
+    // ✅ 핵심: "시작 클릭"을 "압력센서 ON"으로 처리
+    onPressureChange(true);
   }
 }
 
