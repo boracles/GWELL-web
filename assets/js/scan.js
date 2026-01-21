@@ -412,7 +412,7 @@ function stopAmbient() {
 // -----------------------------
 // 상태 및 타이머 관리
 // -----------------------------
-let currentPhase = "A0-1";
+let currentPhase = "__INIT__";
 let scanRunning = false;
 
 let pirOn = false;
