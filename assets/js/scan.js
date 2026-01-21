@@ -3356,9 +3356,9 @@ if (postureEl) {
 // -----------------------------
 if (scanRootEl) {
   scanRootEl.addEventListener("click", () => {
-    // 1) 이미 결과 화면(C2)이면 → 상장 완료 플로우 강제 실행 (테스트용)
+    // ✅ 결과 화면(C2)에서 화면 클릭 = "일어섬"과 동일 처리
     if (currentPhase === "C2") {
-      commitListingFromScan(); // ✅ Supabase insert + C3 → C5
+      onPressureChange(false); // ← C2에서 일어섬이면 commitListingFromScan() 타게 되어있음
       return;
     }
 
@@ -3371,7 +3371,7 @@ if (scanRootEl) {
       currentPhase === "C1";
 
     if (!isScanFastJumpPhase) return;
-    if (scanResultStarted) return; // 이미 한번 넘어간 상태면 무시
+    if (scanResultStarted) return;
 
     const profile = createRandomGutProfile();
     analysisResult = generateAnalysisFromGutProfile(profile);
